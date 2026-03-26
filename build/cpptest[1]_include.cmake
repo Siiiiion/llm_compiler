@@ -1,0 +1,5 @@
+if(EXISTS "/data3/qsy/complier/tlm/build/cpptest[1]_tests.cmake")
+  include("/data3/qsy/complier/tlm/build/cpptest[1]_tests.cmake")
+else()
+  add_test(cpptest_NOT_BUILT cpptest_NOT_BUILT)
+endif()

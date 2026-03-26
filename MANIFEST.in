@@ -1,0 +1,3 @@
+include tvm/libtvm.so
+include tvm/libtvm_runtime.so
+recursive-include tvm/configs *

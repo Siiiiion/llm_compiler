@@ -1,0 +1,1 @@
+cmd='/data3/qsy/complier/tlm/cmake/libs/../../3rdparty/libbacktrace/configure;--prefix=/data3/qsy/complier/tlm/build/libbacktrace;--with-pic;CC=/usr/bin/cc;CFLAGS=-O2 -Wall -fPIC ;LDFLAGS=;CPP=/usr/bin/cc -E;NM=/usr/bin/nm;STRIP=/usr/bin/strip;--host='
