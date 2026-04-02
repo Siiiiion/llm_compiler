@@ -2,13 +2,27 @@ import logging
 import math
 import os
 import sys
+import inspect
 from dataclasses import dataclass, field
 from typing import Optional
 
+import accelerate
 import datasets
-import evaluate
+import numpy as np
 import torch
 from datasets import load_from_disk
+
+# accelerate may access numpy._core on some versions; numpy 1.x only exposes numpy.core.
+if not hasattr(np, "_core") and hasattr(np, "core"):
+    np._core = np.core
+
+if "keep_torch_compile" not in inspect.signature(accelerate.Accelerator.unwrap_model).parameters:
+    _orig_unwrap_model = accelerate.Accelerator.unwrap_model
+
+    def _unwrap_model_compat(self, model, keep_fp32_wrapper=True, keep_torch_compile=None):
+        return _orig_unwrap_model(self, model, keep_fp32_wrapper=keep_fp32_wrapper)
+
+    accelerate.Accelerator.unwrap_model = _unwrap_model_compat
 
 import transformers
 from transformers import (
@@ -20,10 +34,16 @@ from transformers import (
     Trainer,
     TrainingArguments,
     default_data_collator,
-    is_torch_tpu_available,
     set_seed,
 )
 from transformers.trainer_utils import get_last_checkpoint
+
+try:
+    from transformers.utils import is_torch_tpu_available
+except Exception:
+    # Newer versions may move or remove TPU utility in non-TPU setups.
+    def is_torch_tpu_available():
+        return False
 
 os.environ["WANDB_DISABLED"] = "true"
 
@@ -68,7 +88,7 @@ class ModelArguments:
 @dataclass
 class DataTrainingArguments:
     dataset_name: str = field(
-        default="/home/qsy/workspace/gen_data/4090_gen_train",
+        default="/data/qsy/workspace/gen_data/4090_gen_qwen",
         metadata={"help": "Path to tokenized dataset saved by datasets.save_to_disk."},
     )
     max_train_samples: Optional[int] = field(default=None)
@@ -80,7 +100,16 @@ def main():
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     else:
-        model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+        # Backward-compatible alias for older CLI usage.
+        cli_args = []
+        for arg in sys.argv[1:]:
+            if arg == "--evaluation_strategy":
+                cli_args.append("--eval_strategy")
+            elif arg.startswith("--evaluation_strategy="):
+                cli_args.append(arg.replace("--evaluation_strategy=", "--eval_strategy=", 1))
+            else:
+                cli_args.append(arg)
+        model_args, data_args, training_args = parser.parse_args_into_dataclasses(args=cli_args)
 
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -117,7 +146,7 @@ def main():
 
     set_seed(training_args.seed)
 
-    tokenized_datasets = load_from_disk(data_args.dataset_name, keep_in_memory=True)
+    tokenized_datasets = load_from_disk(data_args.dataset_name, keep_in_memory=False)
 
     tokenizer_path = model_args.tokenizer_name or model_args.model_name_or_path
     tokenizer = AutoTokenizer.from_pretrained(
@@ -158,6 +187,13 @@ def main():
         trust_remote_code=model_args.trust_remote_code,
     )
 
+    if model.config.pad_token_id is None and tokenizer.pad_token_id is not None:
+        model.config.pad_token_id = tokenizer.pad_token_id
+
+    if training_args.gradient_checkpointing:
+        # Disable KV cache when gradient checkpointing is enabled to avoid extra memory usage.
+        model.config.use_cache = False
+
     embedding_size = model.get_input_embeddings().weight.shape[0]
     if len(tokenizer) > embedding_size:
         model.resize_token_embeddings(len(tokenizer))
@@ -166,8 +202,13 @@ def main():
         if "train" not in tokenized_datasets:
             raise ValueError("--do_train requires a train split in dataset")
         train_dataset = tokenized_datasets["train"]
+        required_columns = {"input_ids", "attention_mask", "labels"}
+        missing_columns = required_columns - set(train_dataset.column_names)
+        if missing_columns:
+            raise ValueError(f"Train split is missing required columns: {sorted(missing_columns)}")
         if data_args.max_train_samples is not None:
             train_dataset = train_dataset.select(range(min(len(train_dataset), data_args.max_train_samples)))
+        logger.info(f"Loaded train split with {len(train_dataset)} samples")
     else:
         train_dataset = None
 
@@ -175,21 +216,29 @@ def main():
         if "validation" not in tokenized_datasets:
             raise ValueError("--do_eval requires a validation split in dataset")
         eval_dataset = tokenized_datasets["validation"]
+        required_columns = {"input_ids", "attention_mask", "labels"}
+        missing_columns = required_columns - set(eval_dataset.column_names)
+        if missing_columns:
+            raise ValueError(f"Validation split is missing required columns: {sorted(missing_columns)}")
         if data_args.max_eval_samples is not None:
             eval_dataset = eval_dataset.select(range(min(len(eval_dataset), data_args.max_eval_samples)))
+        logger.info(f"Loaded validation split with {len(eval_dataset)} samples")
 
         def preprocess_logits_for_metrics(logits, labels):
             if isinstance(logits, tuple):
                 logits = logits[0]
             return logits.argmax(dim=-1)
 
-        metric = evaluate.load("accuracy")
-
         def compute_metrics(eval_preds):
             preds, labels = eval_preds
-            labels = labels[:, 1:].reshape(-1)
-            preds = preds[:, :-1].reshape(-1)
-            return metric.compute(predictions=preds, references=labels)
+            labels = np.asarray(labels)[:, 1:]
+            preds = np.asarray(preds)[:, :-1]
+            mask = labels != -100
+            total = int(mask.sum())
+            if total == 0:
+                return {"accuracy": 0.0}
+            correct = int(((preds == labels) & mask).sum())
+            return {"accuracy": correct / total}
 
     else:
         eval_dataset = None

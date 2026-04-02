@@ -2,6 +2,17 @@ from transformers import AutoTokenizer
 from datasets import load_dataset
 
 
+def _resolve_max_length(tokenizer, max_length=None):
+    if max_length is not None:
+        return max_length
+    model_max_length = getattr(tokenizer, "model_max_length", None)
+    # Qwen-like tokenizers may expose very large context windows (e.g. 131072),
+    # but this pipeline expects fixed-size CLM training samples similar to legacy setup.
+    if model_max_length is None or model_max_length > 4096:
+        return 544
+    return model_max_length
+
+
 def json_dfs_without_bracket(json, text_list: list):
     if isinstance(json, dict):
         json = dict(sorted(json.items()))
@@ -50,7 +61,7 @@ def json_to_token(json_lines):
     return token_list
 
 
-def make_dataset(file, dataset_path, tokenizer_path, for_clm_or_mlm, valid_percentage=5):
+def make_dataset(file, dataset_path, tokenizer_path, for_clm_or_mlm, valid_percentage=5, max_length=None):
     data_files = {}
     data_files["train"] = file
     extension = data_files["train"].split(".")[-1]
@@ -81,18 +92,29 @@ def make_dataset(file, dataset_path, tokenizer_path, for_clm_or_mlm, valid_perce
         )
 
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+    effective_max_length = _resolve_max_length(tokenizer, max_length=max_length)
 
     column_names = list(raw_datasets["train"].features)
     if for_clm_or_mlm == "clm":
         def tokenize_function(examples):
-            output = tokenizer(examples["text"], padding="max_length", max_length=tokenizer.model_max_length)
+            output = tokenizer(
+                examples["text"],
+                padding="max_length",
+                truncation=True,
+                max_length=effective_max_length,
+            )
             output["labels"] = output["input_ids"].copy()
-            del output["token_type_ids"]
+            output.pop("token_type_ids", None)
             return output
     elif for_clm_or_mlm == "mlm":
         column_names.remove("labels")
         def tokenize_function(examples):
-            output = tokenizer(examples["text"], padding="max_length", max_length=tokenizer.model_max_length)
+            output = tokenizer(
+                examples["text"],
+                padding="max_length",
+                truncation=True,
+                max_length=effective_max_length,
+            )
             return output
     else:
         assert(False)
@@ -110,7 +132,7 @@ def make_dataset(file, dataset_path, tokenizer_path, for_clm_or_mlm, valid_perce
     tokenized_datasets.save_to_disk(dataset_path)
 
 
-def make_dataset_test(file, dataset_path, tokenizer_path, for_clm_or_mlm):
+def make_dataset_test(file, dataset_path, tokenizer_path, for_clm_or_mlm, max_length=None):
     data_files = {}
     data_files["train"] = file
     extension = data_files["train"].split(".")[-1]
@@ -121,21 +143,32 @@ def make_dataset_test(file, dataset_path, tokenizer_path, for_clm_or_mlm):
     )
 
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+    effective_max_length = _resolve_max_length(tokenizer, max_length=max_length)
 
     if for_clm_or_mlm == "clm":
         def tokenize_function(examples):
-            output = tokenizer(examples["text"])
+            output = tokenizer(
+                examples["text"],
+                padding="max_length",
+                truncation=True,
+                max_length=effective_max_length,
+            )
             input_ids = output["input_ids"]
             for inp in input_ids:
                 del inp[-1]
             attention_mask = output["attention_mask"]
             for mask in attention_mask:
                 del mask[-1]
-            del output["token_type_ids"]
+            output.pop("token_type_ids", None)
             return output
     elif for_clm_or_mlm == "mlm":
         def tokenize_function(examples):
-            output = tokenizer(examples["text"], padding="max_length", max_length=tokenizer.model_max_length)
+            output = tokenizer(
+                examples["text"],
+                padding="max_length",
+                truncation=True,
+                max_length=effective_max_length,
+            )
             return output
     else:
         assert(False)

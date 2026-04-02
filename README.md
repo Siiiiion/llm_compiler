@@ -1,12 +1,4 @@
-# Enabling Tensor Language Model to Assist in Generating High-Performance Tensor Programs for Deep Learning
-
-This repo is based on TVM [v0.12.0](https://github.com/apache/tvm/tree/v0.12.0) and reuses some code from [TenSet](https://github.com/tlc-pack/tenset) and [TLP](https://github.com/zhaiyi000/tlp).
-
-TLM has been integrated into [Ansor](gen), [TVM(MetaSchedule)](meta), MindSpore's [AKG](https://github.com/mindspore-ai/akg) and AKG-MLIR.
-
-[tlm slides](tlm%20slides.pptx)
-
-## Installation
+# Installation
 
 - Build and install this repo following the [guide](docs/install/from_source.rst).
 - You can refer to my installation environment [here](version.log).
