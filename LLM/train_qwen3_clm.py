@@ -4,7 +4,7 @@ import os
 import sys
 import inspect
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import List, Optional
 
 import accelerate
 import datasets
@@ -88,11 +88,153 @@ class ModelArguments:
 @dataclass
 class DataTrainingArguments:
     dataset_name: str = field(
-        default="/data/qsy/workspace/gen_data/4090_gen_qwen",
+        default="/home/qsy/workspace/gen_data/4090_gen_qwen",
         metadata={"help": "Path to tokenized dataset saved by datasets.save_to_disk."},
     )
     max_train_samples: Optional[int] = field(default=None)
     max_eval_samples: Optional[int] = field(default=None)
+    sample_seed: int = field(
+        default=42,
+        metadata={"help": "Random seed used when subsampling train/eval splits."},
+    )
+    subsample_before_mask: bool = field(
+        default=True,
+        metadata={"help": "Subsample and shuffle split before PPT masking for faster smoke tests."},
+    )
+    mask_prefix_before_ppt: bool = field(
+        default=True,
+        metadata={"help": "Mask labels before (and including) PPT marker so loss focuses on decision suffix."},
+    )
+    ppt_marker: str = field(
+        default="PPT",
+        metadata={"help": "Marker token that separates prompt prefix and decision suffix."},
+    )
+    drop_samples_without_ppt: bool = field(
+        default=True,
+        metadata={"help": "Drop samples that do not contain PPT marker in input_ids."},
+    )
+    min_suffix_tokens: int = field(
+        default=16,
+        metadata={"help": "Minimum number of supervised (non -100) suffix tokens kept per sample."},
+    )
+    fix_mistral_regex: bool = field(
+        default=True,
+        metadata={"help": "Try enabling fix_mistral_regex when tokenizer supports it."},
+    )
+
+
+def _build_ppt_marker_id_candidates(tokenizer, marker: str) -> List[List[int]]:
+    candidates = []
+    for text in (marker, f" {marker}", f"{marker} "):
+        ids = tokenizer(text, add_special_tokens=False)["input_ids"]
+        if ids and ids not in candidates:
+            candidates.append(ids)
+    candidates.sort(key=len, reverse=True)
+    return candidates
+
+
+def _find_subseq_end(input_ids: List[int], patterns: List[List[int]]) -> Optional[int]:
+    for i in range(len(input_ids)):
+        for pat in patterns:
+            end = i + len(pat)
+            if end <= len(input_ids) and input_ids[i:end] == pat:
+                return end - 1
+    return None
+
+
+def _load_tokenizer(model_args, data_args, tokenizer_path):
+    tokenizer_kwargs = {
+        "cache_dir": model_args.cache_dir,
+        "use_fast": model_args.use_fast_tokenizer,
+        "revision": model_args.model_revision,
+        "use_auth_token": True if model_args.use_auth_token else None,
+        "trust_remote_code": model_args.trust_remote_code,
+    }
+    if data_args.fix_mistral_regex:
+        tokenizer_kwargs["fix_mistral_regex"] = True
+
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_path, **tokenizer_kwargs)
+    except TypeError:
+        tokenizer_kwargs.pop("fix_mistral_regex", None)
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_path, **tokenizer_kwargs)
+    return tokenizer
+
+
+def _maybe_shuffle_and_select(dataset, split_name, max_samples, seed):
+    if max_samples is None:
+        return dataset
+
+    before = len(dataset)
+    target_size = min(before, max_samples)
+    if target_size <= 0:
+        return dataset.select([])
+
+    if target_size < before:
+        dataset = dataset.shuffle(seed=seed)
+        dataset = dataset.select(range(target_size))
+
+    logger.info(
+        "Subsampled split=%s before_mask=%d after_subsample=%d sample_seed=%d",
+        split_name,
+        before,
+        len(dataset),
+        seed,
+    )
+    return dataset
+
+
+def _apply_ppt_suffix_mask(dataset, split_name, marker_patterns, drop_without_ppt, min_suffix_tokens):
+    before = len(dataset)
+
+    def _mask_one(example):
+        labels = list(example["labels"])
+        input_ids = example["input_ids"]
+        marker_end = _find_subseq_end(input_ids, marker_patterns)
+
+        if marker_end is None:
+            if drop_without_ppt:
+                example["keep_sample"] = 0
+                example["suffix_tokens"] = 0
+            else:
+                labels = [-100] * len(labels)
+                example["keep_sample"] = 1
+                example["suffix_tokens"] = 0
+        else:
+            for idx in range(min(marker_end + 1, len(labels))):
+                labels[idx] = -100
+            suffix_tokens = sum(1 for x in labels if x != -100)
+            example["keep_sample"] = 1 if suffix_tokens >= min_suffix_tokens else 0
+            example["suffix_tokens"] = suffix_tokens
+
+        example["labels"] = labels
+        return example
+
+    dataset = dataset.map(
+        _mask_one,
+        desc=f"Applying PPT suffix mask on {split_name}",
+        load_from_cache_file=True,
+    )
+    dataset = dataset.filter(
+        lambda x: x["keep_sample"] == 1,
+        desc=f"Filtering short/invalid PPT samples on {split_name}",
+        load_from_cache_file=True,
+    )
+    after = len(dataset)
+
+    for col in ("keep_sample", "suffix_tokens"):
+        if col in dataset.column_names:
+            dataset = dataset.remove_columns(col)
+
+    logger.info(
+        "PPT mask split=%s before=%d after=%d dropped=%d drop_ratio=%.4f",
+        split_name,
+        before,
+        after,
+        before - after,
+        0.0 if before == 0 else (before - after) / before,
+    )
+    return dataset
 
 
 def main():
@@ -149,18 +291,18 @@ def main():
     tokenized_datasets = load_from_disk(data_args.dataset_name, keep_in_memory=False)
 
     tokenizer_path = model_args.tokenizer_name or model_args.model_name_or_path
-    tokenizer = AutoTokenizer.from_pretrained(
-        tokenizer_path,
-        cache_dir=model_args.cache_dir,
-        use_fast=model_args.use_fast_tokenizer,
-        revision=model_args.model_revision,
-        use_auth_token=True if model_args.use_auth_token else None,
-        trust_remote_code=model_args.trust_remote_code,
-    )
+    tokenizer = _load_tokenizer(model_args, data_args, tokenizer_path)
 
     # Qwen tokenizer may not define a pad token; use eos token to keep batching stable.
     if tokenizer.pad_token is None and tokenizer.eos_token is not None:
         tokenizer.pad_token = tokenizer.eos_token
+
+    marker_patterns = None
+    if data_args.mask_prefix_before_ppt:
+        marker_patterns = _build_ppt_marker_id_candidates(tokenizer, data_args.ppt_marker)
+        if not marker_patterns:
+            raise ValueError(f"Cannot tokenize ppt_marker={data_args.ppt_marker!r} into non-empty ids")
+        logger.info("Using PPT marker id patterns: %s", marker_patterns)
 
     config = AutoConfig.from_pretrained(
         model_args.model_name_or_path,
@@ -206,6 +348,21 @@ def main():
         missing_columns = required_columns - set(train_dataset.column_names)
         if missing_columns:
             raise ValueError(f"Train split is missing required columns: {sorted(missing_columns)}")
+        if data_args.max_train_samples is not None and data_args.subsample_before_mask:
+            train_dataset = _maybe_shuffle_and_select(
+                train_dataset,
+                split_name="train",
+                max_samples=data_args.max_train_samples,
+                seed=data_args.sample_seed,
+            )
+        if data_args.mask_prefix_before_ppt:
+            train_dataset = _apply_ppt_suffix_mask(
+                train_dataset,
+                split_name="train",
+                marker_patterns=marker_patterns,
+                drop_without_ppt=data_args.drop_samples_without_ppt,
+                min_suffix_tokens=data_args.min_suffix_tokens,
+            )
         if data_args.max_train_samples is not None:
             train_dataset = train_dataset.select(range(min(len(train_dataset), data_args.max_train_samples)))
         logger.info(f"Loaded train split with {len(train_dataset)} samples")
@@ -220,6 +377,21 @@ def main():
         missing_columns = required_columns - set(eval_dataset.column_names)
         if missing_columns:
             raise ValueError(f"Validation split is missing required columns: {sorted(missing_columns)}")
+        if data_args.max_eval_samples is not None and data_args.subsample_before_mask:
+            eval_dataset = _maybe_shuffle_and_select(
+                eval_dataset,
+                split_name="validation",
+                max_samples=data_args.max_eval_samples,
+                seed=data_args.sample_seed + 1,
+            )
+        if data_args.mask_prefix_before_ppt:
+            eval_dataset = _apply_ppt_suffix_mask(
+                eval_dataset,
+                split_name="validation",
+                marker_patterns=marker_patterns,
+                drop_without_ppt=data_args.drop_samples_without_ppt,
+                min_suffix_tokens=data_args.min_suffix_tokens,
+            )
         if data_args.max_eval_samples is not None:
             eval_dataset = eval_dataset.select(range(min(len(eval_dataset), data_args.max_eval_samples)))
         logger.info(f"Loaded validation split with {len(eval_dataset)} samples")

@@ -21,12 +21,9 @@ from tvm.auto_scheduler.measure_record import load_record_from_string
 from common import register_data_path, load_and_register_tasks, get_hold_out_five_files, get_bert_files
 import tvm
 from functools import partial
-import subprocess
 import shutil
-from tokenizer import train_tokenizer, test_model_max_length
-from make_dataset_utils import json_to_token, make_dataset, make_dataset_test
-import re
-from enum import Enum
+from tokenizer import train_tokenizer
+from make_dataset_utils import json_to_token, make_dataset, make_dataset_test, json_dfs_without_bracket
 from tvm.auto_scheduler.measure import MeasureInput
 import numpy as np
 import math
@@ -42,6 +39,8 @@ FOR_GEN_EVAL_SKETCH_ONLY_BERT = "for_gen_eval_sketch_only_bert"  # 仅包含BERT
 FOR_GEN_EVALTUNING_SKETCH = "for_gen_evaltuning_sketch"  # 用于评估和调优调度草图的数据集
 FOR_GEN_TRAIN_SKETCH = "for_gen_train_sketch"  # 用于训练调度草图的数据集
 FOR_GEN_BEST_ALL = "for_gen_best_all"  # 包含所有最佳调度的数据集
+
+DEFAULT_FOR_GEN_MAX_LENGTH = 1024
 
 
 def _build_logger(for_type, save_path, tokenizer_path):
@@ -86,6 +85,9 @@ class ScriptArguments:
     test_file_idx: int = field(default=None, metadata={"help": "测试文件索引"})
     schedule_file_path: str = field(default=None, metadata={"help": "调度文件路径"})
     max_length: int = field(default=None, metadata={"help": "tokenize 时的最大长度，默认自动推断"})
+    valid_percentage: int = field(default=5, metadata={"help": "validation 按源文件划分比例"})
+    min_suffix_tokens: int = field(default=16, metadata={"help": "FOR_GEN 中 PPT 后最少保留的决策 token 数"})
+    split_seed: int = field(default=0, metadata={"help": "FOR_GEN 文件级划分随机种子"})
 
 
 def for_clm_or_mlm(for_type):
@@ -109,7 +111,85 @@ def for_clm_or_mlm(for_type):
         assert(False)
 
 
-def for_gen(lines):
+def _structure_to_text(data):
+    text_list = []
+    json_dfs_without_bracket(data, text_list)
+    return " ".join(text_list)
+
+
+def _normalize_measure_record(json_line):
+    workload_key = json_line["i"][0][0]
+    if isinstance(workload_key, str):
+        json_line["i"][0][0] = json.loads(workload_key)
+
+    steps = json_line["i"][1][1]
+    ppt_idx = None
+    for step_idx, step in enumerate(steps):
+        if step[0] == "SP":
+            sp_list = step[4]
+            for i in range(len(sp_list)):
+                sp_list[i] = 1
+        elif step[0] == "PPT" and ppt_idx is None:
+            ppt_idx = step_idx
+    return json_line, ppt_idx
+
+
+def _get_latency(json_line):
+    latencies = json_line["r"][0]
+    if not latencies:
+        return None
+    valid_latencies = [latency for latency in latencies if latency > 0]
+    if not valid_latencies:
+        return None
+    return sum(valid_latencies) / len(valid_latencies)
+
+
+def _merge_stats(stats_list):
+    merged = {}
+    for stats in stats_list:
+        for key, value in stats.items():
+            merged[key] = merged.get(key, 0) + value
+    return merged
+
+
+def _split_files_for_validation(files, valid_percentage, split_seed):
+    files = list(files)
+    if not files:
+        return [], []
+    if valid_percentage <= 0 or len(files) == 1:
+        return sorted(files), []
+
+    shuffled = list(files)
+    random.Random(split_seed).shuffle(shuffled)
+    validation_count = max(1, round(len(shuffled) * valid_percentage / 100.0))
+    validation_count = min(validation_count, len(shuffled) - 1)
+    validation_files = sorted(shuffled[:validation_count])
+    train_files = sorted(shuffled[validation_count:])
+    return train_files, validation_files
+
+
+def _prepare_dataset_output_dir(save_path):
+    os.makedirs(save_path, exist_ok=True)
+    for name in os.listdir(save_path):
+        if name == "logs":
+            continue
+        path = os.path.join(save_path, name)
+        if os.path.isdir(path):
+            shutil.rmtree(path)
+        else:
+            os.remove(path)
+
+
+def _concat_json_files(input_files, output_file):
+    with open(output_file, "w") as fout:
+        for input_file in input_files:
+            if not input_file or not os.path.exists(input_file):
+                continue
+            with open(input_file, "r") as fin:
+                shutil.copyfileobj(fin, fout)
+
+
+def for_gen_basic(lines):
     """
     处理一般生成类型的数据
     
@@ -158,6 +238,105 @@ def for_gen(lines):
         data["labels"] = latency_min / data["latency"]
 
     return data_list
+
+
+def for_gen(lines, source_file, min_suffix_tokens):
+    if not lines:
+        return [], {
+            "raw_records": 0,
+            "drop_no_ppt": 0,
+            "records_without_latency": 0,
+            "drop_short_suffix": 0,
+            "drop_duplicate": 0,
+            "kept_records": 0,
+        }
+
+    input_obj, _ = load_record_from_string(lines[0])
+    task = auto_scheduler.measure.recover_measure_input(input_obj).task
+    compute_dag = task.compute_dag.print_min()
+    workload_key = task.workload_key
+
+    stats = {
+        "raw_records": 0,
+        "drop_no_ppt": 0,
+        "records_without_latency": 0,
+        "drop_short_suffix": 0,
+        "drop_duplicate": 0,
+        "kept_records": 0,
+    }
+    best_by_input = {}
+    latency_min = float("inf")
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        stats["raw_records"] += 1
+        json_line = json.loads(line)
+        json_line, ppt_idx = _normalize_measure_record(json_line)
+        if ppt_idx is None:
+            stats["drop_no_ppt"] += 1
+            continue
+
+        latency = _get_latency(json_line)
+        if latency is None:
+            stats["records_without_latency"] += 1
+
+        steps = json_line["i"][1][1]
+        suffix_text = _structure_to_text(steps[ppt_idx + 1 :])
+        suffix_token_len = 0 if not suffix_text else len(suffix_text.split())
+        if suffix_token_len < min_suffix_tokens:
+            stats["drop_short_suffix"] += 1
+            continue
+
+        input_key = json.dumps(json_line["i"], sort_keys=True)
+        existing = best_by_input.get(input_key)
+        if existing is not None:
+            existing_latency = existing["latency"]
+            should_replace = False
+            if existing_latency is None and latency is not None:
+                should_replace = True
+            elif existing_latency is not None and latency is not None and latency < existing_latency:
+                should_replace = True
+
+            if not should_replace:
+                stats["drop_duplicate"] += 1
+                continue
+
+        best_by_input[input_key] = {
+            "input_json": copy.deepcopy(json_line["i"]),
+            "latency": latency,
+            "suffix_text": suffix_text,
+            "suffix_token_len": suffix_token_len,
+        }
+        if latency is not None:
+            latency_min = min(latency_min, latency)
+
+    if not best_by_input:
+        return [], stats
+
+    data_list = []
+    for item in best_by_input.values():
+        if latency_min == float("inf") or item["latency"] is None:
+            labels = 1.0
+        else:
+            labels = latency_min / item["latency"]
+        data_list.append(
+            {
+                "source_file": os.path.basename(source_file),
+                "workload_key": workload_key,
+                "latency": item["latency"],
+                "labels": labels,
+                "suffix_text": item["suffix_text"],
+                "suffix_token_len": item["suffix_token_len"],
+                "has_measured_latency": item["latency"] is not None,
+                "text": [compute_dag, item["input_json"]],
+            }
+        )
+
+    stats["kept_records"] = len(data_list)
+    return json_to_token(data_list), stats
 
 
 def for_gen_best(lines):
@@ -378,7 +557,7 @@ def input_to_tokens(task, states, input):
     return [item["text"] for item in json_to_token(data_list)]
 
 
-def process_file(args, tmp_folder, for_type, keep_cnt):
+def process_file(args, tmp_folder, for_type, keep_cnt, min_suffix_tokens):
     """
     处理单个文件
     
@@ -391,17 +570,22 @@ def process_file(args, tmp_folder, for_type, keep_cnt):
     file_i, file = args
     print(file_i, end="    \r", flush=True)  # 显示进度
     with open(file, "r") as f:
-        lines = f.read().strip().split("\n")
+        lines = [line for line in f.read().splitlines() if line.strip()]
     
     # 根据处理类型选择不同的处理函数
-    if for_type == FOR_GEN_TOKENIZER or for_type == FOR_GEN or for_type == FOR_LATENCY:
-        data_list = for_gen(lines)
+    if for_type == FOR_GEN_TOKENIZER or for_type == FOR_LATENCY:
+        data_list = for_gen_basic(lines)
         data_list = json_to_token(data_list)
+        stats = {"raw_records": len(lines), "kept_records": len(data_list)}
+    elif for_type == FOR_GEN:
+        data_list, stats = for_gen(lines, file, min_suffix_tokens)
     elif for_type == FOR_GEN_BEST or for_type == FOR_GEN_BEST_ALL:
         data_list = for_gen_best(lines)
         data_list = json_to_token(data_list)
+        stats = {"raw_records": len(lines), "kept_records": len(data_list)}
     elif for_type == FOR_GEN_EVAL_SKETCH or for_type == FOR_GEN_TRAIN_SKETCH or for_type == FOR_GEN_EVALTUNING_SKETCH or for_type == FOR_GEN_EVAL_SKETCH_ONLY_BERT:
         data_list = for_gen_eval_sketch(lines, keep_cnt, for_type)
+        stats = {"raw_records": len(lines), "kept_records": len(data_list)}
     else:
         assert(False)
 
@@ -410,9 +594,10 @@ def process_file(args, tmp_folder, for_type, keep_cnt):
         for data in data_list:
             json.dump(data, f)
             f.write("\n")
+    return stats
 
 
-def token_files_and_merge(for_type, files, save_path, keep_cnt=None):
+def token_files_and_merge(for_type, files, save_path, keep_cnt=None, min_suffix_tokens=16, output_filename="0_merge.json"):
     """
     并行处理多个文件并合并结果
     
@@ -426,8 +611,8 @@ def token_files_and_merge(for_type, files, save_path, keep_cnt=None):
         str: 合并后的文件名
     """
     os.makedirs(save_path, exist_ok=True)  # 创建保存目录
-    filename = f"{save_path}/0_merge.json"  # 合并后的文件名
-    tmp_folder = f"{save_path}/0_tmp"  # 临时文件夹
+    filename = os.path.join(save_path, output_filename)
+    tmp_folder = os.path.join(save_path, f"{os.path.splitext(output_filename)[0]}_tmp")
     
     # 清理旧的临时文件夹
     if os.path.exists(tmp_folder):
@@ -436,14 +621,26 @@ def token_files_and_merge(for_type, files, save_path, keep_cnt=None):
     
     # 使用多进程并行处理文件
     with Pool(os.cpu_count()) as pool:
-        pool.map(partial(process_file, tmp_folder=tmp_folder, for_type=for_type, keep_cnt=keep_cnt), enumerate(files))
+        stats_list = pool.map(
+            partial(
+                process_file,
+                tmp_folder=tmp_folder,
+                for_type=for_type,
+                keep_cnt=keep_cnt,
+                min_suffix_tokens=min_suffix_tokens,
+            ),
+            enumerate(files),
+        )
     print()
     
     # 合并所有临时文件
-    subprocess.run(f"cat {tmp_folder}/*_part > {filename}", shell=True)
+    _concat_json_files(
+        sorted(glob.glob(os.path.join(tmp_folder, "*_part"))),
+        filename,
+    )
     shutil.rmtree(tmp_folder)  # 清理临时文件夹
     
-    return filename
+    return filename, _merge_stats(stats_list)
 
 
 def main():
@@ -484,7 +681,7 @@ def main():
                 print("Sampled file cnt:", len(files))
                 logger.info("FOR_GEN_TOKENIZER sampled file count=%d", len(files))
             # 处理文件并训练tokenizer
-            filename = token_files_and_merge(script_args.for_type, files, script_args.tokenizer_path)
+            filename, _ = token_files_and_merge(script_args.for_type, files, script_args.tokenizer_path)
             logger.info("FOR_GEN_TOKENIZER merged file=%s", filename)
             train_tokenizer([filename], script_args.tokenizer_path, test_length=True)
             logger.info("FOR_GEN_TOKENIZER train_tokenizer finished")
@@ -508,16 +705,73 @@ def main():
                 files = random.sample(files, script_args.file_cnt)
                 print("Sampled file cnt:", len(files))
                 logger.info("FOR_GEN sampled file count=%d", len(files))
-            # 处理文件并创建数据集
-            filename = token_files_and_merge(script_args.for_type, files, script_args.save_path)
-            logger.info("FOR_GEN merged file=%s", filename)
+            effective_max_length = script_args.max_length or DEFAULT_FOR_GEN_MAX_LENGTH
+            train_files, validation_files = _split_files_for_validation(
+                files,
+                script_args.valid_percentage,
+                script_args.split_seed,
+            )
+            logger.info(
+                "FOR_GEN split train_file_count=%d validation_file_count=%d split_seed=%d",
+                len(train_files),
+                len(validation_files),
+                script_args.split_seed,
+            )
+            logger.info(
+                "FOR_GEN filtering min_suffix_tokens=%d max_length=%d",
+                script_args.min_suffix_tokens,
+                effective_max_length,
+            )
+
+            _prepare_dataset_output_dir(script_args.save_path)
+            train_filename, train_stats = token_files_and_merge(
+                script_args.for_type,
+                train_files,
+                script_args.save_path,
+                min_suffix_tokens=script_args.min_suffix_tokens,
+                output_filename="train_raw.json",
+            )
+            logger.info("FOR_GEN train raw file=%s", train_filename)
+            logger.info("FOR_GEN train stats=%s", train_stats)
+
+            validation_filename = None
+            validation_stats = {}
+            if validation_files:
+                validation_filename, validation_stats = token_files_and_merge(
+                    script_args.for_type,
+                    validation_files,
+                    script_args.save_path,
+                    min_suffix_tokens=script_args.min_suffix_tokens,
+                    output_filename="validation_raw.json",
+                )
+                logger.info("FOR_GEN validation raw file=%s", validation_filename)
+                logger.info("FOR_GEN validation stats=%s", validation_stats)
+
+            combined_filename = os.path.join(script_args.save_path, "0_merge.json")
+            _concat_json_files([train_filename, validation_filename], combined_filename)
+            logger.info("FOR_GEN merged file=%s", combined_filename)
+
             make_dataset(
-                filename,
+                train_filename,
                 script_args.save_path,
                 script_args.tokenizer_path,
                 for_clm_or_mlm(script_args.for_type),
-                max_length=script_args.max_length,
+                valid_percentage=0 if validation_filename else script_args.valid_percentage,
+                max_length=effective_max_length,
+                validation_file=validation_filename,
             )
+            stats_payload = {
+                "for_type": script_args.for_type,
+                "max_length": effective_max_length,
+                "min_suffix_tokens": script_args.min_suffix_tokens,
+                "split_seed": script_args.split_seed,
+                "train_file_count": len(train_files),
+                "validation_file_count": len(validation_files),
+                "train_stats": train_stats,
+                "validation_stats": validation_stats,
+            }
+            with open(os.path.join(script_args.save_path, "for_gen_stats.json"), "w") as f:
+                json.dump(stats_payload, f, indent=2)
             logger.info("FOR_GEN make_dataset finished, output=%s", script_args.save_path)
 
         elif script_args.for_type == FOR_LATENCY:
@@ -540,7 +794,7 @@ def main():
                 print("Sampled file cnt:", len(files))
                 logger.info("FOR_LATENCY sampled file count=%d", len(files))
             # 处理文件并创建数据集
-            filename = token_files_and_merge(script_args.for_type, files, script_args.save_path)
+            filename, _ = token_files_and_merge(script_args.for_type, files, script_args.save_path)
             logger.info("FOR_LATENCY merged file=%s", filename)
             make_dataset(
                 filename,
@@ -571,7 +825,7 @@ def main():
                 print("Sampled file cnt:", len(files))
                 logger.info("FOR_GEN_BEST sampled file count=%d", len(files))
             # 处理文件并创建数据集，valid_percentage=0表示不创建验证集
-            filename = token_files_and_merge(script_args.for_type, files, script_args.save_path)
+            filename, _ = token_files_and_merge(script_args.for_type, files, script_args.save_path)
             logger.info("FOR_GEN_BEST merged file=%s", filename)
             make_dataset(
                 filename,
@@ -590,7 +844,7 @@ def main():
             print("Dataset file cnt:", len(files))
             logger.info("FOR_GEN_BEST_ALL file count=%d", len(files))
             # 不排除任何文件
-            filename = token_files_and_merge(script_args.for_type, files, script_args.save_path)
+            filename, _ = token_files_and_merge(script_args.for_type, files, script_args.save_path)
             logger.info("FOR_GEN_BEST_ALL merged file=%s", filename)
             make_dataset(
                 filename,
@@ -632,7 +886,12 @@ def main():
                 print("Find potential file cnt:", len(files))
                 logger.info("%s potential file count=%d", script_args.for_type, len(files))
             # 处理文件
-            filename = token_files_and_merge(script_args.for_type, files, script_args.save_path, keep_cnt=script_args.keep_cnt)
+            filename, _ = token_files_and_merge(
+                script_args.for_type,
+                files,
+                script_args.save_path,
+                keep_cnt=script_args.keep_cnt,
+            )
             logger.info("%s merged file=%s", script_args.for_type, filename)
 
         elif script_args.for_type == FOR_GEN_TRAIN_SKETCH:
@@ -669,7 +928,12 @@ def main():
             #     from task_sheduler import find_potential_files
             #     files = find_potential_files(files)
             #     print("Find potential file cnt:", len(files))
-            filename = token_files_and_merge(script_args.for_type, files, script_args.save_path, keep_cnt=script_args.keep_cnt)
+            filename, _ = token_files_and_merge(
+                script_args.for_type,
+                files,
+                script_args.save_path,
+                keep_cnt=script_args.keep_cnt,
+            )
             logger.info("FOR_GEN_TRAIN_SKETCH merged file=%s", filename)
 
         else:

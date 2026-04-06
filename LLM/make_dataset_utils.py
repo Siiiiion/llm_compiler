@@ -61,10 +61,18 @@ def json_to_token(json_lines):
     return token_list
 
 
-def make_dataset(file, dataset_path, tokenizer_path, for_clm_or_mlm, valid_percentage=5, max_length=None):
+def _load_raw_datasets(file, valid_percentage=5, validation_file=None):
     data_files = {}
     data_files["train"] = file
     extension = data_files["train"].split(".")[-1]
+    if validation_file is not None:
+        data_files["validation"] = validation_file
+        return load_dataset(
+            extension,
+            data_files=data_files,
+            keep_in_memory=True
+        )
+
     raw_datasets = load_dataset(
         extension,
         data_files=data_files,
@@ -90,6 +98,23 @@ def make_dataset(file, dataset_path, tokenizer_path, for_clm_or_mlm, valid_perce
             split=f"train",
             keep_in_memory=True
         )
+    return raw_datasets
+
+
+def make_dataset(
+    file,
+    dataset_path,
+    tokenizer_path,
+    for_clm_or_mlm,
+    valid_percentage=5,
+    max_length=None,
+    validation_file=None,
+):
+    raw_datasets = _load_raw_datasets(
+        file,
+        valid_percentage=valid_percentage,
+        validation_file=validation_file,
+    )
 
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
     effective_max_length = _resolve_max_length(tokenizer, max_length=max_length)
