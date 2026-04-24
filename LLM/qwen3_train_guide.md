@@ -43,6 +43,7 @@
 下文默认流程是：§3 扩词表 → §4 构建数据集 → §5 smoke → §6/§7 Stage1/2 → §8 结构性验证 → §9 生成。
 如果你暂时不想做扩词表，直接跳过 §3，把所有 `Qwen3-0.6B-tvm-ext` 当作 `Qwen3-0.6B` 使用即可。
 如果你只想复用旧 `4090_gen_qwen` 数据集，见 §10 迁移说明。
+**如果要跑创新点 2 的 DPO / LAPO 偏好训练**（不改动 Stage1/Stage2），见文末 §15。
 
 ---
 
@@ -756,4 +757,309 @@ Callback 默认只在 rank 0 计算，其它 rank metrics 里没这个 key。如
 这是**数据集**决定的，当前数据几乎无有效 latency。继续改进方向：
 
 1. 补测量（让 `run_measure` 跑一批带真实时延的记录）。
-2. 或换成 DPO / 偏好学习（见 `plan/02_thesis_innovations.md`）。
+2. 或换成 DPO / 偏好学习（见 §15 与 `plan/02_thesis_innovations.md`）。
+
+---
+
+## 15. 创新点 2：DPO / LAPO 偏好训练（独立流水线，不改动 Stage1/Stage2）
+
+本章介绍 `plan/02_thesis_innovations.md` 中的创新点 2。整条流水线**完全与 §6/§7 的 Stage1/Stage2 解耦**：
+不修改已有数据集，不改动 CLM 训练脚本，只新增三个脚本——
+
+| 新增文件 | 作用 |
+| --- | --- |
+| `build_preference_pairs.py` | 把 TVM 测量记录拼成 `(prompt, chosen, rejected, latency_gap, latency_weight)` 的 JSONL |
+| `train_qwen3_dpo.py` | 纯 HF Trainer 自实现 DPO / LAPO 损失；通过 `--training_mode` 切换 `sft / dpo / lapo` |
+| `run_train_qwen3_dpo.py` | torchrun 包装；用 `USE_DPO` / `TRAINING_MODE` / `LAPO` 环境变量一键切换 |
+
+训练阶段拓扑：
+
+```
+Stage1 (CLM) ─┐
+              ├──> build_preference_pairs.py ──> Stage3 (DPO / LAPO / SFT-基线)
+Stage2 (可选)─┘
+```
+
+即：**在 Stage1（或 Stage1 + Stage2）的 checkpoint 之上新增一个独立的偏好训练阶段**，
+旧的两个阶段的代码、数据、产物全都原样保留。
+
+### 15.0 前置步骤：为 `measure_records/4090/*.json` 补齐真实 latency
+
+创新点 2 的每一个偏好对都需要 chosen / rejected 的 **真实硬件 latency**。如果直接看
+`/data3/qsy/dataset/measure_records/4090/*.json`，里面绝大多数 record 的 `r` 字段仍然是
+`[[0], 0, 0, 0, 0]`（TVM 在调度搜索时占位，尚未跑 LocalRunner）。跳过这一步，`build_preference_pairs.py`
+会因为无法排序 chosen / rejected 而产出空数据集。
+
+`measure_programs.py` (v2) 新增了目录批量 + 就地补测模式，**不会覆盖已有的有效 latency 行**：
+
+```bash
+cd /home/qsy/workspace/complier/llm_compiler/LLM
+
+# 在 GPU 0 上批量补测 4090 目录下所有文件，已经测过的行保留不动，
+# 只把 r==[[0]] 的那些行挑出来重跑 LocalRunner，结果追加回原文件。
+CUDA_VISIBLE_DEVICES=0 /home/qsy/anaconda3/envs/tlm/bin/python measure_programs.py \
+  --target "cuda -model=4090" \
+  --input-dir /data3/qsy/dataset/measure_records/4090 \
+  --batch-size 128 \
+  --resume \
+  --drop-hold-out
+```
+
+关键行为：
+
+- **就地写回原文件**：内部流程是「先把文件重写成只含已测 record」作为 checkpoint，再调用 TVM
+  `RecordToFile`（默认 append 模式）把补测结果追加进同一个文件。中途 Ctrl-C 不会丢失已测数据。
+- `--resume`：若某个文件里所有 record 都已有 latency，则整文件跳过（批量模式默认开）。
+- `--drop-hold-out`：自动排除 `common.get_hold_out_five_files()` 返回的 hold-out workload，避免偏好对
+  训练集污染最终评测集（默认开，显式关闭请用 `--no-drop-hold-out`）。
+- `--max-records-per-file N`：调试期限制每文件最多只测 N 行（默认不限）。
+- `--start-file-idx / --end-file-idx / --max-files`：按目录排序切片，方便多机多卡并行；例如两张卡各测一半：
+
+  ```bash
+  # GPU 0：前一半文件
+  CUDA_VISIBLE_DEVICES=0 python3 measure_programs.py --target "cuda -model=4090" \
+      --input-dir /data3/qsy/dataset/measure_records/4090 --end-file-idx 100
+  # GPU 1：后一半文件
+  CUDA_VISIBLE_DEVICES=1 python3 measure_programs.py --target "cuda -model=4090" \
+      --input-dir /data3/qsy/dataset/measure_records/4090 --start-file-idx 100
+  ```
+
+- `--cuda-visible X`：等价于启动前 `export CUDA_VISIBLE_DEVICES=X`，脚本内部会在 `import tvm` 之前生效。
+
+运行结束后控制台会打印 SUMMARY：
+
+```
+========== SUMMARY ==========
+  total_files: 237
+  fully_measured_skipped: 15
+  files_updated: 222
+  total_already_measured: 18394
+  total_newly_measured: 126801
+  total_seconds: 17842.5
+```
+
+对旧用法的兼容：仍然支持 `--to-measure-path X --measured-path Y` 单文件模式；加 `--resume` 可在
+已有输出文件上续测，不加则保持旧行为（启动时清空 `--measured-path`）。
+
+> v2 修复：移除旧脚本硬编码的 `CUDA_VISIBLE_DEVICES="3"`；删除名存实亡的 `--start-idx / --end-idx /
+> --step-idx` 参数；修复 resume 能力缺失。
+
+### 15.1 第一步：构造偏好对数据集
+
+**硬前提**：必须先跑完 §15.0，让 `/data3/qsy/dataset/measure_records/4090/*.json` 中每条记录的
+`r[0]` 至少有一个 `>0` 的元素。`build_preference_pairs.py` 会直接读取这个目录。
+
+```bash
+cd /home/qsy/workspace/complier/llm_compiler/LLM
+
+/home/qsy/anaconda3/envs/tlm/bin/python build_preference_pairs.py \
+  --target "cuda -model=4090" \
+  --dataset_path /data3/qsy/dataset/measure_records/4090 \
+  --save_path /home/qsy/workspace/gen_data/4090_prefs \
+  --min_latency_gap_ratio 1.5 \
+  --max_pairs_per_group 4 \
+  --max_pairs_per_workload 512 \
+  --min_suffix_tokens 8 \
+  --max_prompt_tokens 512 \
+  --max_suffix_tokens 512 \
+  --valid_percentage 5 \
+  --split_seed 0 \
+  --sample_seed 42 \
+  --weight_strategy log_gap \
+  --weight_clip 5.0 \
+  --drop_hold_out_workloads True \
+  --ppt_marker PPT
+```
+
+产物：
+
+- `4090_prefs/train_pairs.jsonl`
+- `4090_prefs/validation_pairs.jsonl`（`valid_percentage=0` 时没有）
+- `4090_prefs/build_stats.json`：过滤 / 采样统计
+- `4090_prefs/logs/build_preference_pairs.log`
+
+每条记录字段：
+
+| 字段 | 含义 |
+| --- | --- |
+| `prompt` | compute DAG + 直到 PPT 为止的 steps 序列化（与 §4 的 text 编码规则完全一致） |
+| `chosen` | 同组内 latency 最低的 suffix 序列 |
+| `rejected` | 同组内 latency ≥ `min_latency_gap_ratio × chosen` 的较慢 suffix |
+| `latency_chosen` / `latency_rejected` | 原始 ms 值 |
+| `latency_gap` | `latency_rejected / latency_chosen` |
+| `latency_weight` | 由 `--weight_strategy` 计算的 LAPO 权重，≥ 1 |
+
+`weight_strategy` 可选：
+
+| 值 | 公式 | 适用 |
+| --- | --- | --- |
+| `uniform` | 恒为 1 | 等价于 vanilla DPO |
+| `log_gap` | `max(1, log(gap) + 1)` | 推荐首选，抑制极端值 |
+| `linear_gap` | `max(1, gap)` | 强调大差距样本 |
+| `clipped_linear` | `min(weight_clip, max(1, gap))` | 需要手工截断时使用 |
+
+### 15.2 第二步：训练——一键切换 SFT / DPO / LAPO
+
+最关键的可控参数：**`TRAINING_MODE`**（也可用更直观的 `USE_DPO` / `LAPO`），优先级 `TRAINING_MODE > LAPO > USE_DPO`。
+
+**(a) 标准 DPO 训练（默认）**
+
+```bash
+cd /home/qsy/workspace/complier/llm_compiler/LLM
+
+CUDA_VISIBLE_DEVICES=0,1,2,3 \
+NPROC_PER_NODE=4 \
+PREFERENCE_DATASET=/home/qsy/workspace/gen_data/4090_prefs \
+POLICY_MODEL_PATH=/home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-ext \
+REF_MODEL_PATH=/home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-ext \
+TOKENIZER_NAME=/home/qsy/huggingface/model/Qwen3-0.6B-tvm-ext \
+OUTPUT_DIR=/home/qsy/huggingface/model/Qwen3-0.6B-4090-dpo-v2-ext \
+TRAINING_MODE=dpo \
+BETA=0.1 \
+LEARNING_RATE=5e-7 \
+NUM_TRAIN_EPOCHS=1 \
+PER_DEVICE_TRAIN_BATCH_SIZE=4 \
+GRADIENT_ACCUMULATION_STEPS=2 \
+MAX_PROMPT_LENGTH=512 \
+MAX_LENGTH=1024 \
+LOG_FILE=run_train_dpo_v2_ext.log \
+SESSION_NAME=qwen3_dpo_v2_ext \
+DELETE_LOG_IF_EXISTS=1 \
+/home/qsy/anaconda3/envs/tlm/bin/python run_train_qwen3_dpo.py
+```
+
+**(b) 关闭 DPO，只做 SFT 基线（用于消融对比）**
+
+```bash
+# 其它环境变量不变，只改一行：
+USE_DPO=false \
+OUTPUT_DIR=/home/qsy/huggingface/model/Qwen3-0.6B-4090-sft-baseline-v2-ext \
+SESSION_NAME=qwen3_sft_baseline_v2_ext \
+/home/qsy/anaconda3/envs/tlm/bin/python run_train_qwen3_dpo.py
+```
+
+此时脚本会：不加载 ref_model、不做偏好损失，只把 `chosen` suffix 当作监督目标做标准 CLM，相当于一个"在
+高质量子集上的 Stage2"基线。论文消融里的 "DPO vs SFT" 两栏就靠这一组命令跑出来。
+
+**(c) LAPO (Latency-Weighted DPO)**
+
+```bash
+# 等价于 TRAINING_MODE=lapo
+LAPO=true \
+BETA=0.1 \
+LAPO_WEIGHT_CLIP=10.0 \
+LAPO_NORMALIZE=1 \
+OUTPUT_DIR=/home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v2-ext \
+SESSION_NAME=qwen3_lapo_v2_ext \
+/home/qsy/anaconda3/envs/tlm/bin/python run_train_qwen3_dpo.py
+```
+
+若 `build_preference_pairs.py` 用 `--weight_strategy log_gap`（默认），LAPO 将按
+`log(latency_gap)` 对每对样本加权。`LAPO_NORMALIZE=1` 会把一个 batch 内的平均权重归一化成 1，
+保持与 DPO 相近的梯度尺度。
+
+### 15.3 `run_train_qwen3_dpo.py` 全部环境变量
+
+#### 模式切换（核心）
+
+| 变量 | 作用 | 默认 |
+| --- | --- | --- |
+| `TRAINING_MODE` | 显式指定 `sft` / `dpo` / `lapo`；优先级最高 | 空 |
+| `LAPO` | 便捷开关；为 true 时覆盖 `USE_DPO` | `false` |
+| `USE_DPO` | DPO 总开关；为 false 则退化为 SFT | `true` |
+| `BETA` | DPO 温度系数 β | `0.1` |
+| `LOSS_TYPE` | `sigmoid` 或 `hinge` | `sigmoid` |
+| `LABEL_SMOOTHING` | IPO 风格的 label smoothing | `0.0` |
+| `LAPO_WEIGHT_CLIP` | LAPO 权重上限 | `10.0` |
+| `LAPO_NORMALIZE` | batch 内权重归一化 | `1` |
+
+#### 路径 & 数据
+
+| 变量 | 作用 | 默认 |
+| --- | --- | --- |
+| `PREFERENCE_DATASET` | §15.1 产出目录（含 `train_pairs.jsonl`） | `~/workspace/gen_data/4090_prefs` |
+| `POLICY_MODEL_PATH` / `MODEL_NAME_OR_PATH` | policy 起点（通常 Stage1 / Stage2 产物） | 自动 fallback 到 `struct-stage2 → struct-stage1 → tvm-ext → base` |
+| `REF_MODEL_PATH` | 参考模型；不设则复用 policy | 同 policy |
+| `TOKENIZER_NAME` | tokenizer；建议与 policy 一致 | policy |
+| `OUTPUT_DIR` | 输出目录；不设则按 `training_mode` 自动命名 | `Qwen3-0.6B-4090-<mode>` |
+| `MAX_PROMPT_LENGTH` / `MAX_LENGTH` | 截断长度 | `512 / 1024` |
+
+#### 分布式 / 训练超参
+
+| 变量 | 默认 |
+| --- | --- |
+| `CUDA_VISIBLE_DEVICES` | `0,1,2,3` |
+| `NPROC_PER_NODE` | 可见 GPU 数 |
+| `MASTER_PORT` | `29541`（与 CLM 的 `29531` 错开） |
+| `PER_DEVICE_TRAIN_BATCH_SIZE` | `4`（smoke `1`） |
+| `GRADIENT_ACCUMULATION_STEPS` | `2` |
+| `LEARNING_RATE` | `5e-7`（DPO 通常比 CLM 小一个量级） |
+| `NUM_TRAIN_EPOCHS` | `1` |
+| `LOGGING_STEPS / EVAL_STEPS / SAVE_STEPS` | `50 / 500 / 1000` |
+| `METRIC_FOR_BEST_MODEL` | `eval_loss` |
+| `GREATER_IS_BETTER` | `0`（loss 越小越好） |
+| `SMOKE_TEST` | `0`；为 `1` 时自动缩小 batch / step |
+
+其它 `WARMUP_*`、`MAX_STEPS`、`MAX_TRAIN_SAMPLES`、`GRADIENT_CHECKPOINTING`、
+`DATALOADER_NUM_WORKERS` 等语义与 §11 的 CLM 版本完全一致，不再赘述。
+
+### 15.4 日志里关注这些字段
+
+训练时每 `LOGGING_STEPS` 步会看到：
+
+```
+{'loss': 0.482, 'loss/dpo': 0.482,
+ 'reward/chosen_mean': 0.0134,  'reward/rejected_mean': -0.0921,
+ 'reward/margin_mean': 0.1055,  'reward/accuracy': 0.78, ... }
+```
+
+| 指标 | 含义 |
+| --- | --- |
+| `reward/accuracy` | 一个 batch 内 "chosen 的隐式 reward > rejected 的隐式 reward" 的比例；健康训练应从 `0.5` 上升到 `0.8+` |
+| `reward/margin_mean` | 平均 margin，逐步变大说明模型在学会"分辨好坏" |
+| `loss/sft` | 仅 `TRAINING_MODE=sft` 时出现，是普通 CLM 交叉熵 |
+
+### 15.5 训练后的下游评估
+
+DPO / LAPO checkpoint 的评估 **完全复用 §8 `eval_struct.py` 与 §9 `gen_state.py`**，
+把 `--model_name_or_path` 换成 DPO 产物即可。例如：
+
+```bash
+/home/qsy/anaconda3/envs/tlm/bin/python eval_struct.py \
+  --model_name_or_path /home/qsy/huggingface/model/Qwen3-0.6B-4090-dpo-v2-ext \
+  --sketch_path /home/qsy/workspace/dataset/sketch/4090/sketch.json \
+  --target "cuda -model=4090" \
+  --do_build True \
+  --output_json ./eval_struct_dpo.json
+```
+
+论文里推荐报告的对比三组：
+
+1. Stage1 checkpoint（baseline，只学合法性）
+2. Stage1 + SFT（`USE_DPO=false`，仅在 chosen 上继续训练）
+3. Stage1 + DPO 或 Stage1 + LAPO
+
+以 `build_valid_rate`、真实 latency speedup、`reward/accuracy` 三条指标画表。
+
+### 15.6 FAQ
+
+**Q1：ref_model 和 policy 是同一份是否冲突？**
+不会。训练前 ref_model 被 `.eval()` 并 `requires_grad_(False)`；在 DDP 下也不会被 wrap。
+不过它确实会额外占用 0.6B × 2 字节 ≈ 1.2 GB 显存。4090 完全装得下。
+
+**Q2：我没做 §3 扩词表，这条流水线能跑吗？**
+可以。只要把 `TOKENIZER_NAME` 和 `POLICY_MODEL_PATH` 换成原生 `Qwen3-0.6B` / `struct-stage1` 即可；
+`build_preference_pairs.py` 与 tokenizer 解耦（它只按空格切分文本，不调用 tokenizer）。
+
+**Q3：偏好对太少怎么办？**
+调低 `--min_latency_gap_ratio`（比如 1.2）、调高 `--max_pairs_per_group`；或继续补 LocalRunner 测量。
+`build_stats.json` 里 `drop_small_gap` / `groups` 数字可以直接指示哪个卡点最大。
+
+**Q4：训练 loss 不降？**
+先确认 `reward/accuracy` 是否 > 0.5。若 < 0.5，说明偏好对构造错了（chosen/rejected 方向搞反）——
+检查 `latency_chosen < latency_rejected` 是否成立。其次降低 `BETA`（0.05 / 0.02），或
+把 `LEARNING_RATE` 降到 `1e-7`。
+
+**Q5：要不要在 DPO 前先做 Stage2？**
+经验上：数据足够时（> 50k 偏好对），跳过 Stage2 直接 Stage1 → DPO 效果更好；
+数据少时 Stage1 → Stage2 → DPO 更稳。两条路径都不需要改动 §6/§7 的任何代码。
