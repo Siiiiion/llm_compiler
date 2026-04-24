@@ -29,6 +29,7 @@ from transformers import (
     AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
+    DataCollatorForSeq2Seq,
     EarlyStoppingCallback,
     HfArgumentParser,
     Trainer,
@@ -186,11 +187,28 @@ def _maybe_shuffle_and_select(dataset, split_name, max_samples, seed):
 
 def _apply_ppt_suffix_mask(dataset, split_name, marker_patterns, drop_without_ppt, min_suffix_tokens):
     before = len(dataset)
+    has_precomputed = "ppt_end" in dataset.column_names
+    if has_precomputed:
+        logger.info(
+            "PPT mask split=%s using precomputed 'ppt_end' column (fast path)",
+            split_name,
+        )
+    else:
+        logger.info(
+            "PPT mask split=%s falling back to runtime subseq search (legacy dataset)",
+            split_name,
+        )
 
     def _mask_one(example):
         labels = list(example["labels"])
         input_ids = example["input_ids"]
-        marker_end = _find_subseq_end(input_ids, marker_patterns)
+
+        if has_precomputed:
+            marker_end = int(example.get("ppt_end", -1))
+            if marker_end < 0:
+                marker_end = None
+        else:
+            marker_end = _find_subseq_end(input_ids, marker_patterns)
 
         if marker_end is None:
             if drop_without_ppt:
@@ -201,9 +219,10 @@ def _apply_ppt_suffix_mask(dataset, split_name, marker_patterns, drop_without_pp
                 example["keep_sample"] = 1
                 example["suffix_tokens"] = 0
         else:
-            for idx in range(min(marker_end + 1, len(labels))):
+            cutoff = min(marker_end + 1, len(labels))
+            for idx in range(cutoff):
                 labels[idx] = -100
-            suffix_tokens = sum(1 for x in labels if x != -100)
+            suffix_tokens = len(labels) - cutoff
             example["keep_sample"] = 1 if suffix_tokens >= min_suffix_tokens else 0
             example["suffix_tokens"] = suffix_tokens
 
@@ -222,7 +241,7 @@ def _apply_ppt_suffix_mask(dataset, split_name, marker_patterns, drop_without_pp
     )
     after = len(dataset)
 
-    for col in ("keep_sample", "suffix_tokens"):
+    for col in ("keep_sample", "suffix_tokens", "ppt_end"):
         if col in dataset.column_names:
             dataset = dataset.remove_columns(col)
 
@@ -340,6 +359,14 @@ def main():
     if len(tokenizer) > embedding_size:
         model.resize_token_embeddings(len(tokenizer))
 
+    def _strip_unused_length_column(ds):
+        # If group_by_length is on, Trainer reads training_args.length_column_name.
+        if training_args.group_by_length:
+            return ds
+        if "length" in ds.column_names:
+            ds = ds.remove_columns("length")
+        return ds
+
     if training_args.do_train:
         if "train" not in tokenized_datasets:
             raise ValueError("--do_train requires a train split in dataset")
@@ -365,6 +392,7 @@ def main():
             )
         if data_args.max_train_samples is not None:
             train_dataset = train_dataset.select(range(min(len(train_dataset), data_args.max_train_samples)))
+        train_dataset = _strip_unused_length_column(train_dataset)
         logger.info(f"Loaded train split with {len(train_dataset)} samples")
     else:
         train_dataset = None
@@ -394,6 +422,7 @@ def main():
             )
         if data_args.max_eval_samples is not None:
             eval_dataset = eval_dataset.select(range(min(len(eval_dataset), data_args.max_eval_samples)))
+        eval_dataset = _strip_unused_length_column(eval_dataset)
         logger.info(f"Loaded validation split with {len(eval_dataset)} samples")
 
         def preprocess_logits_for_metrics(logits, labels):
@@ -417,20 +446,58 @@ def main():
         compute_metrics = None
         preprocess_logits_for_metrics = None
 
+    # Dynamic padding saves a lot of FLOPs when sequences are shorter than max_length.
+    # Samples from the new dataset are stored unpadded; legacy datasets are already
+    # pre-padded so collator.pad() is effectively a no-op for them.
+    data_collator = DataCollatorForSeq2Seq(
+        tokenizer,
+        model=model,
+        label_pad_token_id=-100,
+        pad_to_multiple_of=8,
+        return_tensors="pt",
+    )
+
+    callbacks = []
+    if model_args.early_stopping_patience:
+        callbacks.append(EarlyStoppingCallback(model_args.early_stopping_patience))
+
+    # Optional structural evaluation via eval_struct.StructuralEvalCallback.
+    # Only activated when STRUCT_EVAL_SKETCH_PATH is provided; keeps default
+    # training path independent of TVM startup cost.
+    struct_sketch = os.environ.get("STRUCT_EVAL_SKETCH_PATH")
+    struct_target = os.environ.get("STRUCT_EVAL_TARGET")
+    if training_args.do_eval and struct_sketch and struct_target:
+        try:
+            from eval_struct import StructuralEvalCallback  # noqa: WPS433
+            callbacks.append(
+                StructuralEvalCallback(
+                    sketch_path=struct_sketch,
+                    target=struct_target,
+                    max_workloads=int(os.environ.get("STRUCT_EVAL_MAX_WORKLOADS", "32")),
+                    max_states_per_workload=int(os.environ.get("STRUCT_EVAL_MAX_STATES", "2")),
+                    max_new_tokens=int(os.environ.get("STRUCT_EVAL_MAX_NEW_TOKENS", "512")),
+                    batch_size=int(os.environ.get("STRUCT_EVAL_BATCH_SIZE", "8")),
+                    do_build=os.environ.get("STRUCT_EVAL_DO_BUILD", "0").lower() in {"1", "true", "yes"},
+                    do_sample=os.environ.get("STRUCT_EVAL_DO_SAMPLE", "0").lower() in {"1", "true", "yes"},
+                    seed=int(os.environ.get("STRUCT_EVAL_SEED", "42")),
+                )
+            )
+            logger.info("StructuralEvalCallback enabled: sketch=%s target=%s", struct_sketch, struct_target)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Failed to register StructuralEvalCallback: %s", exc)
+
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         tokenizer=tokenizer,
-        data_collator=default_data_collator,
+        data_collator=data_collator,
         compute_metrics=compute_metrics if training_args.do_eval and not is_torch_tpu_available() else None,
         preprocess_logits_for_metrics=preprocess_logits_for_metrics
         if training_args.do_eval and not is_torch_tpu_available()
         else None,
-        callbacks=[EarlyStoppingCallback(model_args.early_stopping_patience)]
-        if model_args.early_stopping_patience
-        else None,
+        callbacks=callbacks or None,
     )
 
     if training_args.do_train:

@@ -145,24 +145,31 @@ if _looks_like_local_path(tokenizer_name) and not _is_valid_local_tokenizer_dir(
 if os.path.exists(log_file) and _env_flag("DELETE_LOG_IF_EXISTS", False):
     os.remove(log_file)
 
-per_device_train_batch_size = os.environ.get("PER_DEVICE_TRAIN_BATCH_SIZE", "1" if smoke_test else "2")
-per_device_eval_batch_size = os.environ.get("PER_DEVICE_EVAL_BATCH_SIZE", "1" if smoke_test else "2")
-gradient_accumulation_steps = os.environ.get("GRADIENT_ACCUMULATION_STEPS", "4")
+per_device_train_batch_size = os.environ.get("PER_DEVICE_TRAIN_BATCH_SIZE", "2" if smoke_test else "8")
+per_device_eval_batch_size = os.environ.get("PER_DEVICE_EVAL_BATCH_SIZE", "2" if smoke_test else "8")
+gradient_accumulation_steps = os.environ.get("GRADIENT_ACCUMULATION_STEPS", "1")
 logging_steps = os.environ.get("LOGGING_STEPS", "5" if smoke_test else "100")
 eval_steps = os.environ.get("EVAL_STEPS", "10" if smoke_test else "2000")
 save_steps = os.environ.get("SAVE_STEPS", "20" if smoke_test else "2000")
 save_total_limit = os.environ.get("SAVE_TOTAL_LIMIT", "1" if smoke_test else "3")
-dataloader_num_workers = os.environ.get("DATALOADER_NUM_WORKERS", "0" if smoke_test else "4")
+dataloader_num_workers = os.environ.get("DATALOADER_NUM_WORKERS", "0" if smoke_test else "8")
+dataloader_persistent_workers = _env_flag("DATALOADER_PERSISTENT_WORKERS", not smoke_test)
 warmup_ratio = os.environ.get("WARMUP_RATIO", "0.03")
 warmup_steps = os.environ.get("WARMUP_STEPS")
 max_steps = os.environ.get("MAX_STEPS", "20" if smoke_test else None)
 max_train_samples = os.environ.get("MAX_TRAIN_SAMPLES", "2048" if smoke_test else None)
 max_eval_samples = os.environ.get("MAX_EVAL_SAMPLES", "256" if smoke_test else None)
 metric_for_best_model = os.environ.get("METRIC_FOR_BEST_MODEL", "eval_accuracy")
+greater_is_better = _env_flag("GREATER_IS_BETTER", True)
 min_suffix_tokens = os.environ.get("MIN_SUFFIX_TOKENS", "16")
 sample_seed = os.environ.get("SAMPLE_SEED", "42")
 load_best_model_at_end = _env_flag("LOAD_BEST_MODEL_AT_END", not smoke_test)
 overwrite_output_dir = _env_flag("OVERWRITE_OUTPUT_DIR", smoke_test)
+# Large batch + dynamic padding on 0.6B bf16 makes gradient_checkpointing unnecessary.
+# Keep it as an opt-in escape hatch for when you push batch size even higher.
+gradient_checkpointing = _env_flag("GRADIENT_CHECKPOINTING", False)
+group_by_length = _env_flag("GROUP_BY_LENGTH", False)
+remove_unused_columns = _env_flag("REMOVE_UNUSED_COLUMNS", True)
 
 cmd_parts = [
     shlex.quote(torchrun_bin),
@@ -180,7 +187,7 @@ cmd_parts = [
     f"--gradient_accumulation_steps={gradient_accumulation_steps}",
     f"--logging_steps={logging_steps}",
     f"--num_train_epochs={num_train_epochs}",
-    "--remove_unused_columns=False",
+    f"--remove_unused_columns={remove_unused_columns}",
     f"--learning_rate={learning_rate}",
     f"--eval_strategy=steps",
     f"--eval_steps={eval_steps}",
@@ -188,8 +195,10 @@ cmd_parts = [
     f"--save_steps={save_steps}",
     f"--save_total_limit={save_total_limit}",
     f"--dataloader_num_workers={dataloader_num_workers}",
+    f"--dataloader_persistent_workers={dataloader_persistent_workers}",
     "--bf16=True",
-    "--gradient_checkpointing=True",
+    f"--gradient_checkpointing={gradient_checkpointing}",
+    f"--group_by_length={group_by_length}",
     "--mask_prefix_before_ppt=True",
     "--drop_samples_without_ppt=True",
     "--subsample_before_mask=True",
@@ -208,7 +217,7 @@ if load_best_model_at_end:
         [
             "--load_best_model_at_end=True",
             f"--metric_for_best_model={metric_for_best_model}",
-            "--greater_is_better=True",
+            f"--greater_is_better={greater_is_better}",
         ]
     )
 if overwrite_output_dir:

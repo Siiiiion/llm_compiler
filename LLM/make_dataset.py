@@ -88,6 +88,7 @@ class ScriptArguments:
     valid_percentage: int = field(default=5, metadata={"help": "validation 按源文件划分比例"})
     min_suffix_tokens: int = field(default=16, metadata={"help": "FOR_GEN 中 PPT 后最少保留的决策 token 数"})
     split_seed: int = field(default=0, metadata={"help": "FOR_GEN 文件级划分随机种子"})
+    ppt_marker: str = field(default="PPT", metadata={"help": "用于定位 decision suffix 起点的 marker 字符串"})
 
 
 def for_clm_or_mlm(for_type):
@@ -759,12 +760,14 @@ def main():
                 valid_percentage=0 if validation_filename else script_args.valid_percentage,
                 max_length=effective_max_length,
                 validation_file=validation_filename,
+                ppt_marker=script_args.ppt_marker,
             )
             stats_payload = {
                 "for_type": script_args.for_type,
                 "max_length": effective_max_length,
                 "min_suffix_tokens": script_args.min_suffix_tokens,
                 "split_seed": script_args.split_seed,
+                "ppt_marker": script_args.ppt_marker,
                 "train_file_count": len(train_files),
                 "validation_file_count": len(validation_files),
                 "train_stats": train_stats,
@@ -802,6 +805,7 @@ def main():
                 script_args.tokenizer_path,
                 for_clm_or_mlm(script_args.for_type),
                 max_length=script_args.max_length,
+                ppt_marker=script_args.ppt_marker,
             )
             logger.info("FOR_LATENCY make_dataset finished, output=%s", script_args.save_path)
 
@@ -834,6 +838,7 @@ def main():
                 for_clm_or_mlm(script_args.for_type),
                 valid_percentage=0,
                 max_length=script_args.max_length,
+                ppt_marker=script_args.ppt_marker,
             )
             logger.info("FOR_GEN_BEST make_dataset finished, output=%s", script_args.save_path)
 
@@ -853,6 +858,7 @@ def main():
                 for_clm_or_mlm(script_args.for_type),
                 valid_percentage=0,
                 max_length=script_args.max_length,
+                ppt_marker=script_args.ppt_marker,
             )
             logger.info("FOR_GEN_BEST_ALL make_dataset finished, output=%s", script_args.save_path)
 

@@ -1,3 +1,5 @@
+from typing import List, Optional
+
 from transformers import AutoTokenizer
 from datasets import load_dataset
 
@@ -101,6 +103,28 @@ def _load_raw_datasets(file, valid_percentage=5, validation_file=None):
     return raw_datasets
 
 
+def build_ppt_marker_id_candidates(tokenizer, marker: str = "PPT") -> List[List[int]]:
+    """Try common surface forms of the marker token and return unique id sequences."""
+    candidates: List[List[int]] = []
+    for text in (marker, f" {marker}", f"{marker} ", f" {marker} "):
+        ids = tokenizer(text, add_special_tokens=False)["input_ids"]
+        if ids and ids not in candidates:
+            candidates.append(ids)
+    candidates.sort(key=len, reverse=True)
+    return candidates
+
+
+def _find_ppt_end(input_ids: List[int], patterns: List[List[int]]) -> int:
+    """Return the index (inclusive) of the last token of the PPT marker, or -1 if absent."""
+    n = len(input_ids)
+    for i in range(n):
+        for pat in patterns:
+            end = i + len(pat)
+            if end <= n and input_ids[i:end] == pat:
+                return end - 1
+    return -1
+
+
 def make_dataset(
     file,
     dataset_path,
@@ -109,7 +133,16 @@ def make_dataset(
     valid_percentage=5,
     max_length=None,
     validation_file=None,
+    ppt_marker: Optional[str] = "PPT",
 ):
+    """Tokenize the raw JSON file into a HuggingFace dataset on disk.
+
+    Changes vs legacy version:
+    - Remove ``padding="max_length"``; only do truncation so that training can
+      use dynamic padding via ``DataCollatorForSeq2Seq``.
+    - Precompute ``length`` and ``ppt_end`` columns so training can apply the
+      PPT suffix mask in O(1) per sample.
+    """
     raw_datasets = _load_raw_datasets(
         file,
         valid_percentage=valid_percentage,
@@ -119,16 +152,24 @@ def make_dataset(
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
     effective_max_length = _resolve_max_length(tokenizer, max_length=max_length)
 
+    ppt_patterns: List[List[int]] = []
+    if for_clm_or_mlm == "clm" and ppt_marker:
+        ppt_patterns = build_ppt_marker_id_candidates(tokenizer, ppt_marker)
+
     column_names = list(raw_datasets["train"].features)
     if for_clm_or_mlm == "clm":
         def tokenize_function(examples):
             output = tokenizer(
                 examples["text"],
-                padding="max_length",
+                padding=False,
                 truncation=True,
                 max_length=effective_max_length,
             )
-            output["labels"] = output["input_ids"].copy()
+            input_ids_batch = output["input_ids"]
+            output["labels"] = [list(ids) for ids in input_ids_batch]
+            output["length"] = [len(ids) for ids in input_ids_batch]
+            if ppt_patterns:
+                output["ppt_end"] = [_find_ppt_end(ids, ppt_patterns) for ids in input_ids_batch]
             output.pop("token_type_ids", None)
             return output
     elif for_clm_or_mlm == "mlm":
@@ -136,10 +177,12 @@ def make_dataset(
         def tokenize_function(examples):
             output = tokenizer(
                 examples["text"],
-                padding="max_length",
+                padding=False,
                 truncation=True,
                 max_length=effective_max_length,
             )
+            output["length"] = [len(ids) for ids in output["input_ids"]]
+            output.pop("token_type_ids", None)
             return output
     else:
         assert(False)
@@ -174,26 +217,31 @@ def make_dataset_test(file, dataset_path, tokenizer_path, for_clm_or_mlm, max_le
         def tokenize_function(examples):
             output = tokenizer(
                 examples["text"],
-                padding="max_length",
+                padding=False,
                 truncation=True,
                 max_length=effective_max_length,
             )
             input_ids = output["input_ids"]
             for inp in input_ids:
-                del inp[-1]
+                if len(inp) > 0:
+                    del inp[-1]
             attention_mask = output["attention_mask"]
             for mask in attention_mask:
-                del mask[-1]
+                if len(mask) > 0:
+                    del mask[-1]
+            output["length"] = [len(ids) for ids in output["input_ids"]]
             output.pop("token_type_ids", None)
             return output
     elif for_clm_or_mlm == "mlm":
         def tokenize_function(examples):
             output = tokenizer(
                 examples["text"],
-                padding="max_length",
+                padding=False,
                 truncation=True,
                 max_length=effective_max_length,
             )
+            output["length"] = [len(ids) for ids in output["input_ids"]]
+            output.pop("token_type_ids", None)
             return output
     else:
         assert(False)
