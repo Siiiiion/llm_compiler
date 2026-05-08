@@ -1,0 +1,2331 @@
+nohup: ignoring input
+`loss_type=None` was set in the config but it is unrecognized. Using the default loss: `ForCausalLMLoss`.
+/data3/qsy/complier/tlm/python/tvm/meta_schedule/testing/tune_utils.py:52: UserWarning: Model input value range for shape [1, 128] of int64 is not set!
+  warnings.warn(
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Generate Sketches		#s: 1
+Sample Initial Population	#s: 53	fail_ct: 1995	Time elapsed: 5.80
+GA Iter: 0	Max score: 0.9422	Min score: 0.0471	#Pop: 53	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 1.0000	Min score: 0.9773	#Pop: 128	#M+: 1391	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 58.21
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................******************************************************Eterminate called after throwing an instance of 'tvm::runtime::InternalError'
+  what():  [17:50:44] /data3/qsy/complier/tlm/src/runtime/cuda/cuda_module.cc:61: CUDAError: cuModuleUnload(module_[i]) failed with error: CUDA_ERROR_MISALIGNED_ADDRESS
+Stack trace:
+  0: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::CUDAModuleNode>::Deleter_(tvm::runtime::Object*)
+  1: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::LibraryModuleNode>::Deleter_(tvm::runtime::Object*)
+  2: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncS
+  3: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncSubObjIZNS0_9profiling17WrapTimeE
+  4: TVMObjectFree
+  5: __pyx_tp_dealloc_3tvm_4_ffi_4_cy3_4core_PackedFuncBase(_object*)
+  6: subtype_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/typeobject.c:1460
+  7: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  8: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  9: cell_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/cellobject.c:82
+  10: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  11: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  12: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  13: tupledealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/tupleobject.c:276
+  14: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  15: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  16: func_clear
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:636
+  17: func_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:648
+  18: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  19: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  20: frame_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/frameobject.c:591
+  21: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  22: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  23: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5080
+  24: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  25: do_call_core
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5945
+  26: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4277
+  27: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  28: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  29: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  30: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  31: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  32: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  33: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  34: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  35: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  36: PyEval_EvalCode
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:1134
+  37: builtin_exec_impl
+        at /usr/local/src/conda/python-3.10.18/Python/bltinmodule.c:1058
+  38: builtin_exec
+        at /usr/local/src/conda/python-3.10.18/Python/clinic/bltinmodule.c.h:371
+  39: cfunction_vectorcall_FASTCALL
+        at /usr/local/src/conda/python-3.10.18/Objects/methodobject.c:430
+  40: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  41: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  42: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  43: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  44: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  45: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  46: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  47: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  48: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  49: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  50: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  51: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  52: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  53: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  54: pymain_run_module
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:297
+  55: pymain_run_python
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:589
+  56: Py_RunMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:674
+  57: Py_BytesMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:1094
+  58: __libc_start_main
+        at ../csu/libc-start.c:308
+  59: 0x000000000058728d
+  60: 0xffffffffffffffff
+
+
+Workload: bert_large
+AutoScheduler log: /home/qsy/workspace/complier/llm_compiler/result/bert_large_1x128_4090.json
+==== Task 0: vm_mod_fused_nn_batch_matmul_3 (weight 24 key: ["3ed6b8b696d74a428d188b1a05553246", [1, 128, 1024], [1, 1024, 4096], [1, 128, 4096]]) =====
+p0 = PLACEHOLDER [1, 128, 1024]
+p1 = PLACEHOLDER [1, 1024, 4096]
+T_batch_matmul_NN(b, i, j) += (p0[0, i, k]*p1[0, k, j])
+
+==== Task 1: vm_mod_fused_variance (weight 49 key: ["f4076cf77b9c332e704707e2981ab70e", [1, 128, 1024], [1, 128, 1], [1, 128, 1]]) =====
+p0 = PLACEHOLDER [1, 128, 1024]
+p1 = PLACEHOLDER [1, 128, 1]
+T_subtract(ax0, ax1, ax2) = (p0[ax0, ax1, ax2] - p1[ax0, ax1, 0])
+T_multiply(ax0, ax1, ax2) = (T_subtract[ax0, ax1, ax2]*T_subtract[ax0, ax1, ax2])
+T_multiply_red(ax0, ax1, ax2) += T_multiply[ax0, ax1, k2]
+T_divide(ax0, ax1, ax2) = (T_multiply_red[ax0, ax1, ax2]/1024f)
+
+==== Task 2: vm_mod_fused_nn_batch_matmul_1 (weight 24 key: ["97d6699a083ccfb8655170ee1eb94e98", [16, 128, 64], [16, 64, 128], [16, 128, 128]]) =====
+p0 = PLACEHOLDER [16, 128, 64]
+p1 = PLACEHOLDER [16, 64, 128]
+T_batch_matmul_NN(b, i, j) += (p0[b, i, k]*p1[b, k, j])
+
+==== Task 3: vm_mod_fused_nn_batch_matmul_4 (weight 24 key: ["3ed6b8b696d74a428d188b1a05553246", [1, 128, 4096], [1, 4096, 1024], [1, 128, 1024]]) =====
+p0 = PLACEHOLDER [1, 128, 4096]
+p1 = PLACEHOLDER [1, 4096, 1024]
+T_batch_matmul_NN(b, i, j) += (p0[0, i, k]*p1[0, k, j])
+
+==== Task 4: vm_mod_fused_nn_batch_matmul (weight 96 key: ["3ed6b8b696d74a428d188b1a05553246", [1, 128, 1024], [1, 1024, 1024], [1, 128, 1024]]) =====
+p0 = PLACEHOLDER [1, 128, 1024]
+p1 = PLACEHOLDER [1, 1024, 1024]
+T_batch_matmul_NN(b, i, j) += (p0[0, i, k]*p1[0, k, j])
+
+==== Task 5: vm_mod_fused_nn_batch_matmul_2 (weight 24 key: ["97d6699a083ccfb8655170ee1eb94e98", [16, 128, 128], [16, 128, 64], [16, 128, 64]]) =====
+p0 = PLACEHOLDER [16, 128, 128]
+p1 = PLACEHOLDER [16, 128, 64]
+T_batch_matmul_NN(b, i, j) += (p0[b, i, k]*p1[b, k, j])
+
+==== Task 6: vm_mod_fused_nn_fast_softmax_broadcast_to (weight 24 key: ["e9b946222771d439a3d55a341ca06155", [1, 16, 128, 128], [1, 16, 128, 128]]) =====
+p0 = PLACEHOLDER [1, 16, 128, 128]
+T_softmax_maxelem(i0, i1, i2) max= p0[i0, i1, i2, k]
+T_softmax_delta(i0, i1, i2, i3) = (p0[i0, i1, i2, i3] - T_softmax_maxelem[i0, i1, i2])
+T_fast_exp(ax0, ax1, ax2, ax3) = max((tir.reinterpret(tir.shift_left(int32((tir.floor(((max(min(T_softmax_delta[ax0, ax1, ax2, a ..(OMITTED).. max_delta[ax0, ax1, ax2, ax3], 88.3763f), -88.3763f)*1.4427f) + 0.5f))*0.693147f))) + 1f)), T_softmax_delta[ax0, ax1, ax2, ax3])
+T_softmax_expsum(i0, i1, i2) += T_fast_exp[i0, i1, i2, k]
+T_softmax_norm(i0, i1, i2, i3) = (T_fast_exp[i0, i1, i2, i3]/T_softmax_expsum[i0, i1, i2])
+T_broadcast_to(ax0, ax1, ax2, ax3) = T_softmax_norm[ax0, ax1, ax2, ax3]
+
+==== Task 7: vm_mod_fused_mean (weight 49 key: ["80312e579af64168aa60737451fa5268", [1, 128, 1024], [1, 128, 1]]) =====
+p0 = PLACEHOLDER [1, 128, 1024]
+p0_red(ax0, ax1, ax2) += p0[ax0, ax1, k2]
+T_divide(ax0, ax1, ax2) = (p0_red[ax0, ax1, ax2]/1024f)
+
+==== Task 8: vm_mod_fused_nn_dense_add_fast_tanh (weight 1 key: ["a723805aa800d126c16753e831967576", [1, 1024], [1024, 1024], [1, 1024], [1, 1024]]) =====
+p0 = PLACEHOLDER [1, 1024]
+p1 = PLACEHOLDER [1024, 1024]
+T_matmul_NT(i, j) += (p0[i, k]*p1[j, k])
+p2 = PLACEHOLDER [1, 1024]
+T_add(ax0, ax1) = (T_matmul_NT[ax0, ax1] + p2[ax0, ax1])
+T_minimum(ax0, ax1) = min(9f, T_add[ax0, ax1])
+T_maximum(ax0, ax1) = max(-9f, T_minimum[ax0, ax1])
+T_fast_tanh(ax0, ax1) = ((T_maximum[ax0, ax1]*(((T_maximum[ax0, ax1]*T_maximum[ax0, ax1])*(((T_maximum[ax0, ax1]*T_maximum[ax0,  ..(OMITTED).. *T_maximum[ax0, ax1])*(((T_maximum[ax0, ax1]*T_maximum[ax0, ax1])*1.19826e-06f) + 0.000118535f)) + 0.00226843f)) + 0.00489353f))
+
+|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |            - |              - |      0 |
+|    1 |                                         vm_mod_fused_variance |            - |              - |      0 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |            - |              - |      0 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |            - |              - |      0 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |            - |              - |      0 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |            - |              - |      0 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |            - |              - |      0 |
+|    7 |                                             vm_mod_fused_mean |            - |              - |      0 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |            - |              - |      0 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: - ms	Trials: 0	Used time : 0 s	Next ID: 0	
+*E**********
+Time elapsed for measurement: 45.30 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.81 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Generate Sketches		#s: 2
+Sample Initial Population	#s: 262	fail_ct: 1786	Time elapsed: 3.08
+GA Iter: 0	Max score: 1.0000	Min score: 0.4795	#Pop: 128	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 1.0000	Min score: 0.9676	#Pop: 128	#M+: 1391	#M-: 42
+EvolutionarySearch		#s: 128	Time elapsed: 8.33
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.042 |       25651.03 |     64 |
+|    1 |                                         vm_mod_fused_variance |            - |              - |      0 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |            - |              - |      0 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |            - |              - |      0 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |            - |              - |      0 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |            - |              - |      0 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |            - |              - |      0 |
+|    7 |                                             vm_mod_fused_mean |            - |              - |      0 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |            - |              - |      0 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: - ms	Trials: 64	Used time : 110 s	Next ID: 1	
+
+Time elapsed for measurement: 24.65 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.17 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Generate Sketches		#s: 1
+Sample Initial Population	#s: 81	fail_ct: 1967	Time elapsed: 6.16
+GA Iter: 0	Max score: 0.9999	Min score: 0.0022	#Pop: 81	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9999	Min score: 0.9792	#Pop: 128	#M+: 1393	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 64.76
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+.............................................................|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.042 |       25651.03 |     64 |
+|    1 |                                         vm_mod_fused_variance |        0.008 |          47.09 |     64 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |            - |              - |      0 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |            - |              - |      0 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |            - |              - |      0 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |            - |              - |      0 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |            - |              - |      0 |
+|    7 |                                             vm_mod_fused_mean |            - |              - |      0 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |            - |              - |      0 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: - ms	Trials: 128	Used time : 147 s	Next ID: 2	
+.T.T..T*************************************************************
+Time elapsed for measurement: 36.66 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 4.21 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Generate Sketches		#s: 1
+Sample Initial Population	#s: 56	fail_ct: 1992	Time elapsed: 6.45
+GA Iter: 0	Max score: 0.9924	Min score: 0.0001	#Pop: 56	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 1.0000	Min score: 0.9784	#Pop: 128	#M+: 1391	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 56.94
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+...............................................................|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.042 |       25651.03 |     64 |
+|    1 |                                         vm_mod_fused_variance |        0.008 |          47.09 |     64 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |            - |              - |      0 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |            - |              - |      0 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |            - |              - |      0 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |            - |              - |      0 |
+|    7 |                                             vm_mod_fused_mean |            - |              - |      0 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |            - |              - |      0 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: - ms	Trials: 192	Used time : 259 s	Next ID: 3	
+.T***************************************************************
+Time elapsed for measurement: 41.13 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.74 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Generate Sketches		#s: 1
+Sample Initial Population	#s: 64	fail_ct: 1984	Time elapsed: 6.18
+GA Iter: 0	Max score: 0.9918	Min score: 0.0009	#Pop: 64	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9999	Min score: 0.9761	#Pop: 128	#M+: 1388	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 57.49
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+...............................................................|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.042 |       25651.03 |     64 |
+|    1 |                                         vm_mod_fused_variance |        0.008 |          47.09 |     64 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.072 |       15000.65 |     64 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |            - |              - |      0 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |            - |              - |      0 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |            - |              - |      0 |
+|    7 |                                             vm_mod_fused_mean |            - |              - |      0 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |            - |              - |      0 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: - ms	Trials: 256	Used time : 364 s	Next ID: 4	
+.T***************************************************************
+Time elapsed for measurement: 36.21 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 3.83 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Generate Sketches		#s: 1
+Sample Initial Population	#s: 78	fail_ct: 1970	Time elapsed: 6.12
+GA Iter: 0	Max score: 0.9968	Min score: 0.0256	#Pop: 78	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9999	Min score: 0.9792	#Pop: 128	#M+: 1384	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 62.54
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.042 |       25651.03 |     64 |
+|    1 |                                         vm_mod_fused_variance |        0.008 |          47.09 |     64 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.072 |       15000.65 |     64 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.021 |       12593.18 |     64 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |            - |              - |      0 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |            - |              - |      0 |
+|    7 |                                             vm_mod_fused_mean |            - |              - |      0 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |            - |              - |      0 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: - ms	Trials: 320	Used time : 468 s	Next ID: 5	
+
+Time elapsed for measurement: 31.25 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.85 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Generate Sketches		#s: 4
+Sample Initial Population	#s: 1578	fail_ct: 470	Time elapsed: 16.32
+GA Iter: 0	Max score: 0.9989	Min score: 0.9171	#Pop: 128	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 1.0000	Min score: 0.9850	#Pop: 128	#M+: 1395	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 68.90
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.042 |       25651.03 |     64 |
+|    1 |                                         vm_mod_fused_variance |        0.008 |          47.09 |     64 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.072 |       15000.65 |     64 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.021 |       12593.18 |     64 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |            - |              - |      0 |
+|    7 |                                             vm_mod_fused_mean |            - |              - |      0 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |            - |              - |      0 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: - ms	Trials: 384	Used time : 569 s	Next ID: 6	
+
+Time elapsed for measurement: 28.06 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.00 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Generate Sketches		#s: 2
+Sample Initial Population	#s: 267	fail_ct: 1781	Time elapsed: 2.30
+GA Iter: 0	Max score: 0.9997	Min score: 0.5485	#Pop: 128	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 1.0000	Min score: 0.9663	#Pop: 128	#M+: 1372	#M-: 56
+EvolutionarySearch		#s: 128	Time elapsed: 7.78
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.042 |       25651.03 |     64 |
+|    1 |                                         vm_mod_fused_variance |        0.008 |          47.09 |     64 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.072 |       15000.65 |     64 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.021 |       12593.18 |     64 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |            - |              - |      0 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |            - |              - |      0 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: - ms	Trials: 448	Used time : 683 s	Next ID: 7	
+
+Time elapsed for measurement: 26.21 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.77 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Generate Sketches		#s: 1
+Sample Initial Population	#s: 97	fail_ct: 3999	Time elapsed: 10.78
+GA Iter: 0	Max score: 0.9971	Min score: 0.0049	#Pop: 97	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9997	Min score: 0.9786	#Pop: 128	#M+: 1387	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 68.13
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................********Eterminate called after throwing an instance of 'tvm::runtime::InternalError'
+  what():  [18:02:32] /data3/qsy/complier/tlm/src/runtime/cuda/cuda_module.cc:61: CUDAError: cuModuleUnload(module_[i]) failed with error: CUDA_ERROR_MISALIGNED_ADDRESS
+Stack trace:
+  0: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::CUDAModuleNode>::Deleter_(tvm::runtime::Object*)
+  1: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::LibraryModuleNode>::Deleter_(tvm::runtime::Object*)
+  2: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncS
+  3: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncSubObjIZNS0_9profiling17WrapTimeE
+  4: TVMObjectFree
+  5: __pyx_tp_dealloc_3tvm_4_ffi_4_cy3_4core_PackedFuncBase(_object*)
+  6: subtype_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/typeobject.c:1460
+  7: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  8: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  9: cell_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/cellobject.c:82
+  10: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  11: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  12: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  13: tupledealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/tupleobject.c:276
+  14: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  15: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  16: func_clear
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:636
+  17: func_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:648
+  18: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  19: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  20: frame_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/frameobject.c:591
+  21: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  22: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  23: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5080
+  24: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  25: do_call_core
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5945
+  26: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4277
+  27: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  28: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  29: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  30: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  31: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  32: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  33: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  34: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  35: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  36: PyEval_EvalCode
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:1134
+  37: builtin_exec_impl
+        at /usr/local/src/conda/python-3.10.18/Python/bltinmodule.c:1058
+  38: builtin_exec
+        at /usr/local/src/conda/python-3.10.18/Python/clinic/bltinmodule.c.h:371
+  39: cfunction_vectorcall_FASTCALL
+        at /usr/local/src/conda/python-3.10.18/Objects/methodobject.c:430
+  40: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  41: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  42: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  43: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  44: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  45: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  46: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  47: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  48: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  49: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  50: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  51: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  52: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  53: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  54: pymain_run_module
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:297
+  55: pymain_run_python
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:589
+  56: Py_RunMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:674
+  57: Py_BytesMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:1094
+  58: __libc_start_main
+        at ../csu/libc-start.c:308
+  59: 0x000000000058728d
+  60: 0xffffffffffffffff
+
+
+|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.042 |       25651.03 |     64 |
+|    1 |                                         vm_mod_fused_variance |        0.008 |          47.09 |     64 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.072 |       15000.65 |     64 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.021 |       12593.18 |     64 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |            - |              - |      0 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: - ms	Trials: 512	Used time : 720 s	Next ID: 8	
+*E****Eterminate called after throwing an instance of 'tvm::runtime::InternalError'
+  what():  [18:02:35] /data3/qsy/complier/tlm/src/runtime/cuda/cuda_module.cc:61: CUDAError: cuModuleUnload(module_[i]) failed with error: CUDA_ERROR_MISALIGNED_ADDRESS
+Stack trace:
+  0: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::CUDAModuleNode>::Deleter_(tvm::runtime::Object*)
+  1: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::LibraryModuleNode>::Deleter_(tvm::runtime::Object*)
+  2: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncS
+  3: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncSubObjIZNS0_9profiling17WrapTimeE
+  4: TVMObjectFree
+  5: __pyx_tp_dealloc_3tvm_4_ffi_4_cy3_4core_PackedFuncBase(_object*)
+  6: subtype_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/typeobject.c:1460
+  7: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  8: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  9: cell_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/cellobject.c:82
+  10: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  11: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  12: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  13: tupledealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/tupleobject.c:276
+  14: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  15: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  16: func_clear
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:636
+  17: func_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:648
+  18: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  19: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  20: frame_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/frameobject.c:591
+  21: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  22: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  23: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5080
+  24: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  25: do_call_core
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5945
+  26: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4277
+  27: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  28: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  29: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  30: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  31: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  32: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  33: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  34: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  35: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  36: PyEval_EvalCode
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:1134
+  37: builtin_exec_impl
+        at /usr/local/src/conda/python-3.10.18/Python/bltinmodule.c:1058
+  38: builtin_exec
+        at /usr/local/src/conda/python-3.10.18/Python/clinic/bltinmodule.c.h:371
+  39: cfunction_vectorcall_FASTCALL
+        at /usr/local/src/conda/python-3.10.18/Objects/methodobject.c:430
+  40: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  41: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  42: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  43: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  44: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  45: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  46: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  47: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  48: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  49: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  50: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  51: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  52: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  53: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  54: pymain_run_module
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:297
+  55: pymain_run_python
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:589
+  56: Py_RunMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:674
+  57: Py_BytesMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:1094
+  58: __libc_start_main
+        at ../csu/libc-start.c:308
+  59: 0x000000000058728d
+  60: 0xffffffffffffffff
+
+
+*E******Eterminate called after throwing an instance of 'tvm::runtime::InternalError'
+  what():  [18:02:38] /data3/qsy/complier/tlm/src/runtime/cuda/cuda_module.cc:61: CUDAError: cuModuleUnload(module_[i]) failed with error: CUDA_ERROR_MISALIGNED_ADDRESS
+Stack trace:
+  0: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::CUDAModuleNode>::Deleter_(tvm::runtime::Object*)
+  1: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::LibraryModuleNode>::Deleter_(tvm::runtime::Object*)
+  2: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncS
+  3: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncSubObjIZNS0_9profiling17WrapTimeE
+  4: TVMObjectFree
+  5: __pyx_tp_dealloc_3tvm_4_ffi_4_cy3_4core_PackedFuncBase(_object*)
+  6: subtype_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/typeobject.c:1460
+  7: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  8: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  9: cell_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/cellobject.c:82
+  10: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  11: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  12: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  13: tupledealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/tupleobject.c:276
+  14: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  15: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  16: func_clear
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:636
+  17: func_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:648
+  18: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  19: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  20: frame_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/frameobject.c:591
+  21: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  22: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  23: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5080
+  24: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  25: do_call_core
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5945
+  26: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4277
+  27: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  28: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  29: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  30: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  31: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  32: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  33: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  34: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  35: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  36: PyEval_EvalCode
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:1134
+  37: builtin_exec_impl
+        at /usr/local/src/conda/python-3.10.18/Python/bltinmodule.c:1058
+  38: builtin_exec
+        at /usr/local/src/conda/python-3.10.18/Python/clinic/bltinmodule.c.h:371
+  39: cfunction_vectorcall_FASTCALL
+        at /usr/local/src/conda/python-3.10.18/Objects/methodobject.c:430
+  40: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  41: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  42: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  43: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  44: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  45: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  46: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  47: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  48: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  49: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  50: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  51: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  52: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  53: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  54: pymain_run_module
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:297
+  55: pymain_run_python
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:589
+  56: Py_RunMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:674
+  57: Py_BytesMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:1094
+  58: __libc_start_main
+        at ../csu/libc-start.c:308
+  59: 0x000000000058728d
+  60: 0xffffffffffffffff
+
+
+*E*Eterminate called after throwing an instance of 'tvm::runtime::InternalError'
+  what():  [18:02:39] /data3/qsy/complier/tlm/src/runtime/cuda/cuda_module.cc:61: CUDAError: cuModuleUnload(module_[i]) failed with error: CUDA_ERROR_MISALIGNED_ADDRESS
+Stack trace:
+  0: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::CUDAModuleNode>::Deleter_(tvm::runtime::Object*)
+  1: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::LibraryModuleNode>::Deleter_(tvm::runtime::Object*)
+  2: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncS
+  3: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncSubObjIZNS0_9profiling17WrapTimeE
+  4: TVMObjectFree
+  5: __pyx_tp_dealloc_3tvm_4_ffi_4_cy3_4core_PackedFuncBase(_object*)
+  6: subtype_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/typeobject.c:1460
+  7: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  8: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  9: cell_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/cellobject.c:82
+  10: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  11: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  12: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  13: tupledealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/tupleobject.c:276
+  14: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  15: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  16: func_clear
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:636
+  17: func_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:648
+  18: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  19: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  20: frame_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/frameobject.c:591
+  21: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  22: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  23: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5080
+  24: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  25: do_call_core
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5945
+  26: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4277
+  27: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  28: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  29: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  30: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  31: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  32: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  33: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  34: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  35: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  36: PyEval_EvalCode
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:1134
+  37: builtin_exec_impl
+        at /usr/local/src/conda/python-3.10.18/Python/bltinmodule.c:1058
+  38: builtin_exec
+        at /usr/local/src/conda/python-3.10.18/Python/clinic/bltinmodule.c.h:371
+  39: cfunction_vectorcall_FASTCALL
+        at /usr/local/src/conda/python-3.10.18/Objects/methodobject.c:430
+  40: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  41: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  42: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  43: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  44: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  45: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  46: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  47: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  48: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  49: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  50: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  51: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  52: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  53: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  54: pymain_run_module
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:297
+  55: pymain_run_python
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:589
+  56: Py_RunMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:674
+  57: Py_BytesMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:1094
+  58: __libc_start_main
+        at ../csu/libc-start.c:308
+  59: 0x000000000058728d
+  60: 0xffffffffffffffff
+
+
+*E*Eterminate called after throwing an instance of 'tvm::runtime::InternalError'
+  what():  [18:02:41] /data3/qsy/complier/tlm/src/runtime/cuda/cuda_module.cc:61: CUDAError: cuModuleUnload(module_[i]) failed with error: CUDA_ERROR_MISALIGNED_ADDRESS
+Stack trace:
+  0: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::CUDAModuleNode>::Deleter_(tvm::runtime::Object*)
+  1: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::LibraryModuleNode>::Deleter_(tvm::runtime::Object*)
+  2: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncS
+  3: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncSubObjIZNS0_9profiling17WrapTimeE
+  4: TVMObjectFree
+  5: __pyx_tp_dealloc_3tvm_4_ffi_4_cy3_4core_PackedFuncBase(_object*)
+  6: subtype_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/typeobject.c:1460
+  7: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  8: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  9: cell_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/cellobject.c:82
+  10: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  11: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  12: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  13: tupledealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/tupleobject.c:276
+  14: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  15: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  16: func_clear
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:636
+  17: func_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:648
+  18: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  19: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  20: frame_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/frameobject.c:591
+  21: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  22: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  23: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5080
+  24: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  25: do_call_core
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5945
+  26: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4277
+  27: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  28: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  29: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  30: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  31: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  32: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  33: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  34: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  35: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  36: PyEval_EvalCode
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:1134
+  37: builtin_exec_impl
+        at /usr/local/src/conda/python-3.10.18/Python/bltinmodule.c:1058
+  38: builtin_exec
+        at /usr/local/src/conda/python-3.10.18/Python/clinic/bltinmodule.c.h:371
+  39: cfunction_vectorcall_FASTCALL
+        at /usr/local/src/conda/python-3.10.18/Objects/methodobject.c:430
+  40: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  41: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  42: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  43: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  44: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  45: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  46: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  47: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  48: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  49: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  50: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  51: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  52: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  53: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  54: pymain_run_module
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:297
+  55: pymain_run_python
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:589
+  56: Py_RunMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:674
+  57: Py_BytesMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:1094
+  58: __libc_start_main
+        at ../csu/libc-start.c:308
+  59: 0x000000000058728d
+  60: 0xffffffffffffffff
+
+
+*E*Eterminate called after throwing an instance of 'tvm::runtime::InternalError'
+  what():  [18:02:42] /data3/qsy/complier/tlm/src/runtime/cuda/cuda_module.cc:61: CUDAError: cuModuleUnload(module_[i]) failed with error: CUDA_ERROR_MISALIGNED_ADDRESS
+Stack trace:
+  0: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::CUDAModuleNode>::Deleter_(tvm::runtime::Object*)
+  1: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::LibraryModuleNode>::Deleter_(tvm::runtime::Object*)
+  2: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncS
+  3: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncSubObjIZNS0_9profiling17WrapTimeE
+  4: TVMObjectFree
+  5: __pyx_tp_dealloc_3tvm_4_ffi_4_cy3_4core_PackedFuncBase(_object*)
+  6: subtype_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/typeobject.c:1460
+  7: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  8: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  9: cell_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/cellobject.c:82
+  10: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  11: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  12: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  13: tupledealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/tupleobject.c:276
+  14: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  15: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  16: func_clear
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:636
+  17: func_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:648
+  18: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  19: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  20: frame_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/frameobject.c:591
+  21: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  22: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  23: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5080
+  24: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  25: do_call_core
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5945
+  26: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4277
+  27: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  28: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  29: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  30: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  31: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  32: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  33: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  34: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  35: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  36: PyEval_EvalCode
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:1134
+  37: builtin_exec_impl
+        at /usr/local/src/conda/python-3.10.18/Python/bltinmodule.c:1058
+  38: builtin_exec
+        at /usr/local/src/conda/python-3.10.18/Python/clinic/bltinmodule.c.h:371
+  39: cfunction_vectorcall_FASTCALL
+        at /usr/local/src/conda/python-3.10.18/Objects/methodobject.c:430
+  40: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  41: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  42: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  43: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  44: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  45: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  46: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  47: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  48: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  49: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  50: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  51: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  52: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  53: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  54: pymain_run_module
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:297
+  55: pymain_run_python
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:589
+  56: Py_RunMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:674
+  57: Py_BytesMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:1094
+  58: __libc_start_main
+        at ../csu/libc-start.c:308
+  59: 0x000000000058728d
+  60: 0xffffffffffffffff
+
+
+*E***************************Eterminate called after throwing an instance of 'tvm::runtime::InternalError'
+  what():  [18:02:53] /data3/qsy/complier/tlm/src/runtime/cuda/cuda_module.cc:61: CUDAError: cuModuleUnload(module_[i]) failed with error: CUDA_ERROR_MISALIGNED_ADDRESS
+Stack trace:
+  0: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::CUDAModuleNode>::Deleter_(tvm::runtime::Object*)
+  1: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::LibraryModuleNode>::Deleter_(tvm::runtime::Object*)
+  2: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncS
+  3: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncSubObjIZNS0_9profiling17WrapTimeE
+  4: TVMObjectFree
+  5: __pyx_tp_dealloc_3tvm_4_ffi_4_cy3_4core_PackedFuncBase(_object*)
+  6: subtype_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/typeobject.c:1460
+  7: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  8: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  9: cell_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/cellobject.c:82
+  10: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  11: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  12: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  13: tupledealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/tupleobject.c:276
+  14: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  15: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  16: func_clear
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:636
+  17: func_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:648
+  18: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  19: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  20: frame_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/frameobject.c:591
+  21: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  22: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  23: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5080
+  24: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  25: do_call_core
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5945
+  26: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4277
+  27: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  28: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  29: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  30: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  31: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  32: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  33: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  34: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  35: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  36: PyEval_EvalCode
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:1134
+  37: builtin_exec_impl
+        at /usr/local/src/conda/python-3.10.18/Python/bltinmodule.c:1058
+  38: builtin_exec
+        at /usr/local/src/conda/python-3.10.18/Python/clinic/bltinmodule.c.h:371
+  39: cfunction_vectorcall_FASTCALL
+        at /usr/local/src/conda/python-3.10.18/Objects/methodobject.c:430
+  40: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  41: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  42: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  43: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  44: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  45: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  46: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  47: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  48: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  49: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  50: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  51: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  52: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  53: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  54: pymain_run_module
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:297
+  55: pymain_run_python
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:589
+  56: Py_RunMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:674
+  57: Py_BytesMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:1094
+  58: __libc_start_main
+        at ../csu/libc-start.c:308
+  59: 0x000000000058728d
+  60: 0xffffffffffffffff
+
+
+*E**********Eterminate called after throwing an instance of 'tvm::runtime::InternalError'
+  what():  [18:02:57] /data3/qsy/complier/tlm/src/runtime/cuda/cuda_module.cc:61: CUDAError: cuModuleUnload(module_[i]) failed with error: CUDA_ERROR_MISALIGNED_ADDRESS
+Stack trace:
+  0: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::CUDAModuleNode>::Deleter_(tvm::runtime::Object*)
+  1: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::LibraryModuleNode>::Deleter_(tvm::runtime::Object*)
+  2: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncS
+  3: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncSubObjIZNS0_9profiling17WrapTimeE
+  4: TVMObjectFree
+  5: __pyx_tp_dealloc_3tvm_4_ffi_4_cy3_4core_PackedFuncBase(_object*)
+  6: subtype_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/typeobject.c:1460
+  7: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  8: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  9: cell_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/cellobject.c:82
+  10: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  11: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  12: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  13: tupledealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/tupleobject.c:276
+  14: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  15: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  16: func_clear
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:636
+  17: func_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:648
+  18: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  19: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  20: frame_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/frameobject.c:591
+  21: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  22: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  23: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5080
+  24: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  25: do_call_core
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5945
+  26: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4277
+  27: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  28: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  29: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  30: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  31: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  32: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  33: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  34: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  35: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  36: PyEval_EvalCode
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:1134
+  37: builtin_exec_impl
+        at /usr/local/src/conda/python-3.10.18/Python/bltinmodule.c:1058
+  38: builtin_exec
+        at /usr/local/src/conda/python-3.10.18/Python/clinic/bltinmodule.c.h:371
+  39: cfunction_vectorcall_FASTCALL
+        at /usr/local/src/conda/python-3.10.18/Objects/methodobject.c:430
+  40: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  41: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  42: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  43: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  44: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  45: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  46: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  47: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  48: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  49: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  50: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  51: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  52: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  53: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  54: pymain_run_module
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:297
+  55: pymain_run_python
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:589
+  56: Py_RunMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:674
+  57: Py_BytesMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:1094
+  58: __libc_start_main
+        at ../csu/libc-start.c:308
+  59: 0x000000000058728d
+  60: 0xffffffffffffffff
+
+
+*E***Eterminate called after throwing an instance of 'tvm::runtime::InternalError'
+  what():  [18:02:59] /data3/qsy/complier/tlm/src/runtime/cuda/cuda_module.cc:61: CUDAError: cuModuleUnload(module_[i]) failed with error: CUDA_ERROR_MISALIGNED_ADDRESS
+Stack trace:
+  0: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::CUDAModuleNode>::Deleter_(tvm::runtime::Object*)
+  1: tvm::runtime::SimpleObjAllocator::Handler<tvm::runtime::LibraryModuleNode>::Deleter_(tvm::runtime::Object*)
+  2: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncS
+  3: _ZN3tvm7runtime18SimpleObjAllocator7HandlerINS0_16PackedFuncSubObjIZNS0_9profiling17WrapTimeE
+  4: TVMObjectFree
+  5: __pyx_tp_dealloc_3tvm_4_ffi_4_cy3_4core_PackedFuncBase(_object*)
+  6: subtype_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/typeobject.c:1460
+  7: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  8: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  9: cell_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/cellobject.c:82
+  10: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  11: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  12: _Py_XDECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:567
+  13: tupledealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/tupleobject.c:276
+  14: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  15: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  16: func_clear
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:636
+  17: func_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/funcobject.c:648
+  18: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  19: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  20: frame_dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/frameobject.c:591
+  21: _Py_Dealloc
+        at /usr/local/src/conda/python-3.10.18/Objects/object.c:2301
+  22: _Py_DECREF
+        at /usr/local/src/conda/python-3.10.18/Include/object.h:500
+  23: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5080
+  24: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  25: do_call_core
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5945
+  26: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4277
+  27: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  28: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  29: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  30: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  31: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  32: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  33: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  34: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  35: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  36: PyEval_EvalCode
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:1134
+  37: builtin_exec_impl
+        at /usr/local/src/conda/python-3.10.18/Python/bltinmodule.c:1058
+  38: builtin_exec
+        at /usr/local/src/conda/python-3.10.18/Python/clinic/bltinmodule.c.h:371
+  39: cfunction_vectorcall_FASTCALL
+        at /usr/local/src/conda/python-3.10.18/Objects/methodobject.c:430
+  40: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  41: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  42: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  43: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  44: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  45: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  46: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  47: _PyObject_VectorcallTstate
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:114
+  48: PyObject_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Include/cpython/abstract.h:123
+  49: call_function
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5893
+  50: _PyEval_EvalFrameDefault
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:4213
+  51: _PyEval_EvalFrame
+        at /usr/local/src/conda/python-3.10.18/Include/internal/pycore_ceval.h:46
+  52: _PyEval_Vector
+        at /usr/local/src/conda/python-3.10.18/Python/ceval.c:5067
+  53: _PyFunction_Vectorcall
+        at /usr/local/src/conda/python-3.10.18/Objects/call.c:342
+  54: pymain_run_module
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:297
+  55: pymain_run_python
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:589
+  56: Py_RunMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:674
+  57: Py_BytesMain
+        at /usr/local/src/conda/python-3.10.18/Modules/main.c:1094
+  58: __libc_start_main
+        at ../csu/libc-start.c:308
+  59: 0x000000000058728d
+  60: 0xffffffffffffffff
+
+
+*E***
+Time elapsed for measurement: 43.22 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.00 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 56	fail_ct: 1992	Time elapsed: 5.80
+GA Iter: 0	Max score: 0.9883	Min score: 0.0073	#Pop: 56	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9998	Min score: 0.9806	#Pop: 128	#M+: 1393	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 56.40
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.042 |       25651.03 |     64 |
+|    1 |                                         vm_mod_fused_variance |        0.008 |          47.09 |     64 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.072 |       15000.65 |     64 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.021 |       12593.18 |     64 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 5.713 ms	Trials: 576	Used time : 842 s	Next ID: 4	
+
+Time elapsed for measurement: 31.01 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 1.26 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 57	fail_ct: 1991	Time elapsed: 5.67
+GA Iter: 0	Max score: 0.7297	Min score: -0.0878	#Pop: 57	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 1.0038	Min score: 0.9165	#Pop: 128	#M+: 1389	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 55.68
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.042 |       25651.03 |     64 |
+|    1 |                                         vm_mod_fused_variance |        0.008 |          47.09 |     64 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.072 |       15000.65 |     64 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.021 |       12593.18 |    128 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 5.713 ms	Trials: 640	Used time : 937 s	Next ID: 3	
+
+Time elapsed for measurement: 33.82 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.00 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 65	fail_ct: 1983	Time elapsed: 5.48
+GA Iter: 0	Max score: 0.9357	Min score: -0.1011	#Pop: 65	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 1.1990	Min score: 0.9507	#Pop: 128	#M+: 1397	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 57.23
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.042 |       25651.03 |     64 |
+|    1 |                                         vm_mod_fused_variance |        0.008 |          47.09 |     64 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.067 |       15955.15 |    128 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.021 |       12593.18 |    128 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 5.611 ms	Trials: 704	Used time : 1032 s	Next ID: 4	
+
+Time elapsed for measurement: 29.51 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 1.06 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 52	fail_ct: 1996	Time elapsed: 5.79
+GA Iter: 0	Max score: 0.8935	Min score: -0.1229	#Pop: 52	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 1.0553	Min score: 0.9293	#Pop: 128	#M+: 1390	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 57.16
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.042 |       25651.03 |     64 |
+|    1 |                                         vm_mod_fused_variance |        0.008 |          47.09 |     64 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.067 |       15955.15 |    128 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.018 |       14636.38 |    192 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 5.325 ms	Trials: 768	Used time : 1126 s	Next ID: 0	
+
+Time elapsed for measurement: 36.12 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.00 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 54	fail_ct: 1994	Time elapsed: 5.39
+GA Iter: 0	Max score: 0.5873	Min score: -0.0995	#Pop: 54	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 1.0817	Min score: 0.9625	#Pop: 128	#M+: 1389	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 57.22
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.041 |       26056.26 |    128 |
+|    1 |                                         vm_mod_fused_variance |        0.008 |          47.09 |     64 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.067 |       15955.15 |    128 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.018 |       14636.38 |    192 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 5.309 ms	Trials: 832	Used time : 1225 s	Next ID: 3	
+
+Time elapsed for measurement: 33.62 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.00 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 68	fail_ct: 1980	Time elapsed: 5.59
+GA Iter: 0	Max score: 0.7529	Min score: -0.0775	#Pop: 68	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 1.0499	Min score: 0.9220	#Pop: 128	#M+: 1382	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 59.13
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.041 |       26056.26 |    128 |
+|    1 |                                         vm_mod_fused_variance |        0.008 |          47.09 |     64 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.064 |       16807.92 |    192 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.018 |       14636.38 |    192 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 5.227 ms	Trials: 896	Used time : 1322 s	Next ID: 4	
+
+Time elapsed for measurement: 31.68 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 1.54 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 54	fail_ct: 1994	Time elapsed: 5.77
+GA Iter: 0	Max score: 0.8581	Min score: -0.1763	#Pop: 54	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9838	Min score: 0.9347	#Pop: 128	#M+: 1387	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 58.43
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+...............................................................|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.041 |       26056.26 |    128 |
+|    1 |                                         vm_mod_fused_variance |        0.008 |          47.09 |     64 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.064 |       16807.92 |    192 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.018 |       14636.38 |    256 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 5.227 ms	Trials: 960	Used time : 1420 s	Next ID: 3	
+.T***************************************************************
+Time elapsed for measurement: 49.79 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.00 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 59	fail_ct: 1989	Time elapsed: 6.09
+GA Iter: 0	Max score: 0.8320	Min score: -0.0951	#Pop: 59	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9869	Min score: 0.9460	#Pop: 128	#M+: 1401	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 58.38
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.041 |       26056.26 |    128 |
+|    1 |                                         vm_mod_fused_variance |        0.008 |          47.09 |     64 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.064 |       16864.62 |    256 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.018 |       14636.38 |    256 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 5.222 ms	Trials: 1024	Used time : 1534 s	Next ID: 0	
+
+Time elapsed for measurement: 35.70 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.00 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 67	fail_ct: 1981	Time elapsed: 5.41
+GA Iter: 0	Max score: 0.8325	Min score: -0.1136	#Pop: 67	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9493	Min score: 0.9011	#Pop: 128	#M+: 1384	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 58.11
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.041 |       26190.77 |    192 |
+|    1 |                                         vm_mod_fused_variance |        0.008 |          47.09 |     64 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.064 |       16864.62 |    256 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.018 |       14636.38 |    256 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 5.217 ms	Trials: 1088	Used time : 1634 s	Next ID: 4	
+
+Time elapsed for measurement: 29.55 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 1.40 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 267	fail_ct: 1781	Time elapsed: 2.36
+GA Iter: 0	Max score: 1.5722	Min score: 0.7079	#Pop: 128	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 1.5722	Min score: 0.7284	#Pop: 128	#M+: 1388	#M-: 76
+EvolutionarySearch		#s: 128	Time elapsed: 8.53
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.041 |       26190.77 |    192 |
+|    1 |                                         vm_mod_fused_variance |        0.008 |          47.09 |     64 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.064 |       16864.62 |    256 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.018 |       14856.06 |    320 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 5.191 ms	Trials: 1152	Used time : 1729 s	Next ID: 1	
+
+Time elapsed for measurement: 26.87 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.00 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 51	fail_ct: 1997	Time elapsed: 5.78
+GA Iter: 0	Max score: 0.8604	Min score: -0.0641	#Pop: 51	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9888	Min score: 0.9610	#Pop: 128	#M+: 1390	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 58.11
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.041 |       26190.77 |    192 |
+|    1 |                                         vm_mod_fused_variance |        0.003 |         148.94 |    128 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.064 |       16864.62 |    256 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.018 |       14856.06 |    320 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 4.911 ms	Trials: 1216	Used time : 1767 s	Next ID: 3	
+
+Time elapsed for measurement: 34.03 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.00 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 68	fail_ct: 1980	Time elapsed: 6.02
+GA Iter: 0	Max score: 0.5520	Min score: -0.1411	#Pop: 68	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9664	Min score: 0.9446	#Pop: 128	#M+: 1399	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 59.87
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.041 |       26190.77 |    192 |
+|    1 |                                         vm_mod_fused_variance |        0.003 |         148.94 |    128 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.064 |       16864.62 |    320 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.018 |       14856.06 |    320 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 4.911 ms	Trials: 1280	Used time : 1865 s	Next ID: 4	
+
+Time elapsed for measurement: 28.10 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.00 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 54	fail_ct: 1994	Time elapsed: 6.15
+GA Iter: 0	Max score: 0.7197	Min score: -0.0294	#Pop: 54	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9670	Min score: 0.9501	#Pop: 128	#M+: 1395	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 59.56
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.041 |       26190.77 |    192 |
+|    1 |                                         vm_mod_fused_variance |        0.003 |         148.94 |    128 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.064 |       16864.62 |    320 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.018 |       15203.24 |    384 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 4.872 ms	Trials: 1344	Used time : 1959 s	Next ID: 0	
+
+Time elapsed for measurement: 34.37 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 1.55 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 58	fail_ct: 1990	Time elapsed: 5.41
+GA Iter: 0	Max score: 0.9172	Min score: -0.4955	#Pop: 58	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9842	Min score: 0.9674	#Pop: 128	#M+: 1407	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 59.73
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.041 |       26311.69 |    256 |
+|    1 |                                         vm_mod_fused_variance |        0.003 |         148.94 |    128 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.064 |       16864.62 |    320 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.018 |       15203.24 |    384 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 4.867 ms	Trials: 1408	Used time : 2061 s	Next ID: 3	
+
+Time elapsed for measurement: 33.50 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.00 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 78	fail_ct: 1970	Time elapsed: 5.46
+GA Iter: 0	Max score: 0.6537	Min score: -0.5111	#Pop: 78	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9670	Min score: 0.9446	#Pop: 128	#M+: 1389	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 62.92
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.041 |       26311.69 |    256 |
+|    1 |                                         vm_mod_fused_variance |        0.003 |         148.94 |    128 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.064 |       16864.62 |    384 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.018 |       15203.24 |    384 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 4.867 ms	Trials: 1472	Used time : 2160 s	Next ID: 4	
+
+Time elapsed for measurement: 28.39 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.00 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 62	fail_ct: 1986	Time elapsed: 5.87
+GA Iter: 0	Max score: 0.4635	Min score: -0.4610	#Pop: 62	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9867	Min score: 0.9672	#Pop: 128	#M+: 1392	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 59.02
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.041 |       26311.69 |    256 |
+|    1 |                                         vm_mod_fused_variance |        0.003 |         148.94 |    128 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.064 |       16864.62 |    384 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.017 |       15422.44 |    448 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 4.843 ms	Trials: 1536	Used time : 2257 s	Next ID: 3	
+
+Time elapsed for measurement: 33.68 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.00 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 54	fail_ct: 1994	Time elapsed: 5.71
+GA Iter: 0	Max score: 0.8794	Min score: -0.4000	#Pop: 54	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9643	Min score: 0.9453	#Pop: 128	#M+: 1403	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 58.75
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.041 |       26311.69 |    256 |
+|    1 |                                         vm_mod_fused_variance |        0.003 |         148.94 |    128 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.064 |       16864.62 |    448 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.017 |       15422.44 |    448 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 4.843 ms	Trials: 1600	Used time : 2356 s	Next ID: 0	
+
+Time elapsed for measurement: 34.43 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.00 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 62	fail_ct: 1986	Time elapsed: 5.79
+GA Iter: 0	Max score: 0.8658	Min score: -0.4265	#Pop: 62	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9665	Min score: 0.9450	#Pop: 128	#M+: 1388	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 60.50
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.041 |       26495.10 |    320 |
+|    1 |                                         vm_mod_fused_variance |        0.003 |         148.94 |    128 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.064 |       16864.62 |    448 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.017 |       15422.44 |    448 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 4.836 ms	Trials: 1664	Used time : 2455 s	Next ID: 4	
+
+Time elapsed for measurement: 28.57 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 2.11 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 106	fail_ct: 3990	Time elapsed: 10.78
+GA Iter: 0	Max score: 0.6170	Min score: -0.5562	#Pop: 106	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9796	Min score: 0.9675	#Pop: 128	#M+: 1386	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 60.32
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.041 |       26495.10 |    320 |
+|    1 |                                         vm_mod_fused_variance |        0.003 |         148.94 |    128 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.064 |       16864.62 |    448 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.017 |       15422.44 |    512 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 4.836 ms	Trials: 1728	Used time : 2552 s	Next ID: 3	
+
+Time elapsed for measurement: 32.79 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.00 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 59	fail_ct: 1989	Time elapsed: 5.39
+GA Iter: 0	Max score: 0.7866	Min score: -0.4540	#Pop: 59	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9657	Min score: 0.9432	#Pop: 128	#M+: 1402	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 62.14
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.041 |       26495.10 |    320 |
+|    1 |                                         vm_mod_fused_variance |        0.003 |         148.94 |    128 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.064 |       16864.62 |    512 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.017 |       15422.44 |    512 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 4.836 ms	Trials: 1792	Used time : 2656 s	Next ID: 4	
+
+Time elapsed for measurement: 27.34 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.00 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 54	fail_ct: 1994	Time elapsed: 5.93
+GA Iter: 0	Max score: 0.6883	Min score: -0.0580	#Pop: 54	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9554	Min score: 0.9429	#Pop: 128	#M+: 1387	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 60.84
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.041 |       26495.10 |    320 |
+|    1 |                                         vm_mod_fused_variance |        0.003 |         148.94 |    128 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.064 |       16864.62 |    512 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.017 |       15433.19 |    576 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 4.835 ms	Trials: 1856	Used time : 2751 s	Next ID: 0	
+
+Time elapsed for measurement: 35.15 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.00 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 55	fail_ct: 1993	Time elapsed: 5.93
+GA Iter: 0	Max score: 0.5018	Min score: -0.4586	#Pop: 55	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9753	Min score: 0.9664	#Pop: 128	#M+: 1396	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 60.02
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.041 |       26495.10 |    384 |
+|    1 |                                         vm_mod_fused_variance |        0.003 |         148.94 |    128 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.064 |       16864.62 |    512 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.017 |       15433.19 |    576 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 4.835 ms	Trials: 1920	Used time : 2854 s	Next ID: 3	
+
+Time elapsed for measurement: 35.13 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.00 s
+----------------------------------------------------------------------
+------------------------------  [ Task Scheduler ]
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+------------------------------  [ Search ]
+----------------------------------------------------------------------
+Sample Initial Population	#s: 80	fail_ct: 1968	Time elapsed: 5.74
+GA Iter: 0	Max score: 0.8172	Min score: -0.5299	#Pop: 80	#M+: 0	#M-: 0
+GA Iter: 4	Max score: 0.9657	Min score: 0.9453	#Pop: 128	#M+: 1402	#M-: 0
+EvolutionarySearch		#s: 128	Time elapsed: 62.72
+----------------------------------------------------------------------
+------------------------------  [ Measure ]
+----------------------------------------------------------------------
+Get 64 programs to measure:
+................................................................****************************************************************|  ID  |                       Task Description                        | Latency (ms) | Speed (GFLOPS) | Trials |
+-----------------------------------------------------------------------------------------------------------------
+|    0 |                                vm_mod_fused_nn_batch_matmul_3 |        0.041 |       26495.10 |    384 |
+|    1 |                                         vm_mod_fused_variance |        0.003 |         148.94 |    128 |
+|    2 |                                vm_mod_fused_nn_batch_matmul_1 |        0.007 |        4814.14 |     64 |
+|    3 |                                vm_mod_fused_nn_batch_matmul_4 |        0.064 |       16864.62 |    576 |
+|    4 |                                  vm_mod_fused_nn_batch_matmul |        0.017 |       15433.19 |    576 |
+|    5 |                                vm_mod_fused_nn_batch_matmul_2 |        0.006 |        5538.79 |     64 |
+|    6 |                     vm_mod_fused_nn_fast_softmax_broadcast_to |        0.003 |        7925.45 |     64 |
+|    7 |                                             vm_mod_fused_mean |        0.003 |          45.75 |     64 |
+|    8 |                           vm_mod_fused_nn_dense_add_fast_tanh |        0.011 |         188.73 |     64 |
+-----------------------------------------------------------------------------------------------------------------
+Estimated total latency: 4.835 ms	Trials: 1984	Used time : 2955 s	Next ID: 4	
+
+Time elapsed for measurement: 27.83 s
+----------------------------------------------------------------------
+------------------------------  [ Train cost model ]
+----------------------------------------------------------------------
+Time elapsed for training: 0.00 s
+Tuning Time:
+ ID |                  Name | Time (min) | Percentage 
+------------------------------------------------------
+    |                 Total |    52.3134 |   100.0000 
+  1 |                Tuning |    50.8585 |    97.2189 
+  2 |        TaskExtraction |     0.7568 |     1.4467 
+  3 | PostTuningCompilation |     0.6981 |     1.3344 
+------------------------------------------------------
+Evaluate inference time cost...
+Execution time summary:
+ mean (ms)   median (ms)    max (ms)     min (ms)     std (ms)  
+   5.6457       5.6456       5.6477       5.6439       0.0012   
+               
