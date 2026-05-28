@@ -29,6 +29,170 @@
 
 ---
 
+## 数学化问题定义与可行性推导
+
+为便于在论文中统一描述本文方法，先将 TVM 自动调度过程形式化。设一个待优化张量程序 workload 为 \(x\)，目标硬件为 \(d\)，TVM AutoScheduler 给出的调度状态空间为 \(\mathcal{S}(x,d)\)。任意候选调度状态 \(s\in\mathcal{S}(x,d)\) 经过代码生成、构建和运行测量后得到真实延迟：
+
+\[
+\ell(s; x,d) > 0.
+\]
+
+传统自动调度器的目标可以写成：
+
+\[
+s^\star=\arg\min_{s\in\mathcal{S}(x,d)} \ell(s;x,d).
+\]
+
+由于 \(\mathcal{S}(x,d)\) 的规模通常呈组合爆炸，直接枚举不可行。本文利用 `PPT` 将调度状态序列拆为调度草图 prompt 与细粒度决策 suffix。设调度记录被序列化为：
+
+\[
+z=(c, p, y),
+\]
+
+其中 \(c\) 表示计算图、硬件信息与 workload 上下文，\(p=(a_1,\ldots,a_m)\) 表示 `PPT` 及其之前的 sketch step 序列，\(y=(y_1,\ldots,y_n)\) 表示 `PPT` 之后由模型生成的 decision suffix。于是 LLM 需要学习的不是完整搜索策略，而是条件分布：
+
+\[
+\pi_\theta(y\mid c,p)=\prod_{t=1}^{n}\pi_\theta(y_t\mid c,p,y_{<t}).
+\]
+
+模型生成的 suffix 通过 TVM 解析器回放为候选状态：
+
+\[
+s=\Phi(c,p,y),
+\]
+
+其中 \(\Phi(\cdot)\) 表示从文本 token 序列到 `MeasureInput/State` 的确定性还原函数。若解析失败，则 \(\Phi(c,p,y)=\bot\)。因此本文方法的可行性可分解为两个目标：
+
+\[
+\Pr_{y\sim\pi_\theta(\cdot\mid c,p)}[\Phi(c,p,y)\neq \bot] \rightarrow 1,
+\]
+
+\[
+\begin{aligned}
+&\mathbb{E}_{\substack{y\sim\pi_\theta(\cdot\mid c,p)\\ \Phi(c,p,y)\neq\bot}}
+\left[\ell(\Phi(c,p,y);x,d)\right]
+\rightarrow \min.
+\end{aligned}
+\]
+
+前者对应“结构合法性”，由领域词表、PPT 后缀监督、语法约束解码和结构评估保证；后者对应“性能偏好”，由真实 latency 偏好对与 LAPO/DPO 训练推动。
+
+### 0.1 PPT 后缀监督的目标函数
+
+当前 `train_qwen3_clm.py` 中的训练方式只对 `PPT` 之后的 suffix 计算损失。令完整 token 序列为 \(u=(u_1,\ldots,u_T)\)，`PPT` 结束位置为 \(\tau\)，则监督 mask 为：
+
+\[
+M_t=
+\begin{cases}
+0, & t\le \tau,\\
+1, & t>\tau.
+\end{cases}
+\]
+
+对应的 suffix-only causal language modeling 损失为：
+
+\[
+\begin{aligned}
+\mathcal{L}_{\text{SFT}}(\theta)
+&=
+-\mathbb{E}_{(c,p,y)\sim\mathcal{D}}
+\left[
+\sum_{t=1}^{T-1}
+M_{t+1}\log \pi_\theta(u_{t+1}\mid u_{\le t})
+\right].
+\end{aligned}
+\]
+
+该目标避免模型把容量浪费在复现计算图、硬件信息和 sketch prompt 上，而把梯度集中到真正需要模型决策的调度后缀。若不使用 PPT mask，则损失会变成：
+
+\[
+\begin{aligned}
+\mathcal{L}_{\text{Full}}(\theta)
+&=
+-\mathbb{E}_{u\sim\mathcal{D}}
+\left[
+\sum_{t=1}^{T-1}
+\log \pi_\theta(u_{t+1}\mid u_{\le t})
+\right],
+\end{aligned}
+\]
+
+其中大量 token 属于确定性上下文 \(c,p\)，会稀释 suffix 决策 token 的学习权重。设上下文长度为 \(T_p\)，后缀长度为 \(T_y\)，则 Full-CLM 中真正与调度决策相关的梯度占比近似为：
+
+\[
+\rho=\frac{T_y}{T_p+T_y}.
+\]
+
+在本项目中后缀 token 往往明显短于完整样本，因此采用 PPT suffix-only loss 能提高有效梯度密度。
+
+### 0.2 领域词表扩展的复杂度收益
+
+设原始 BPE tokenizer 对 TVM DSL 序列的平均长度为 \(N_{\text{old}}\)，扩展领域 token 后平均长度为 \(N_{\text{new}}\)。若新增 token 集合为 \(\mathcal{V}_{\text{TVM}}\)，其中 token \(v\) 在数据中出现 \(c_v\) 次，原 tokenizer 平均将其拆成 \(b_v\) 个子词，则：
+
+\[
+\begin{aligned}
+N_{\text{new}}
+&\approx
+N_{\text{old}}-\sum_{v\in\mathcal{V}_{\text{TVM}}}c_v(b_v-1).
+\end{aligned}
+\]
+
+Transformer 自注意力的主要计算量与序列长度平方相关，因此理论吞吐提升近似满足：
+
+\[
+\begin{aligned}
+\frac{\text{Cost}_{\text{new}}}{\text{Cost}_{\text{old}}}
+&\approx
+\left(\frac{N_{\text{new}}}{N_{\text{old}}}\right)^2.
+\end{aligned}
+\]
+
+如果扩词表使平均长度降低 30%，即 \(N_{\text{new}}=0.7N_{\text{old}}\)，则注意力部分计算量约降为：
+
+\[
+0.7^2=0.49,
+\]
+
+这解释了 `extend_tokenizer.py` 在训练和推理吞吐上具备可观收益的原因。新增 token 的 embedding 使用旧子词均值 warm-start：
+
+\[
+e(v)=\frac{1}{|\mathcal{B}(v)|}\sum_{b\in\mathcal{B}(v)}e_{\text{old}}(b),
+\]
+
+其中 \(\mathcal{B}(v)\) 是旧 tokenizer 对 \(v\) 的子词分解。该初始化使新增 TVM token 在训练初期就落在合理语义邻域，避免随机初始化导致 loss 突增。
+
+### 0.3 语法约束解码的合法性保证
+
+设 TVM schedule step 语法定义的合法 suffix 语言为 \(\mathcal{L}_G\)，当前已生成前缀为 \(r=y_{<t}\)。语法自动机给出下一步允许 token 集合：
+
+\[
+\mathcal{A}_G(r)=\{a\in\mathcal{V}\mid r\circ a \text{ 是某个合法序列的前缀}\}.
+\]
+
+在普通解码中，模型分布为 \(\pi_\theta(a\mid c,p,r)\)。加入 grammar logits processor 后，约束分布变为：
+
+\[
+\pi_\theta^G(a\mid c,p,r)=
+\begin{cases}
+\dfrac{\exp(g_a/T)}{\sum_{b\in\mathcal{A}_G(r)}\exp(g_b/T)}, & a\in\mathcal{A}_G(r),\\
+0, & a\notin\mathcal{A}_G(r),
+\end{cases}
+\]
+
+其中 \(g_a\) 是模型输出 logits，\(T\) 是采样温度。由于每一步都只从 \(\mathcal{A}_G(r)\) 采样，可用归纳法证明生成序列始终是某个合法 TVM step 序列的前缀；当遇到终止状态时，有：
+
+\[
+\Pr_{y\sim\pi_\theta^G}[y\in\mathcal{L}_G]=1.
+\]
+
+若进一步把 loop id 范围、stage id 范围、step 参数个数等局部语义约束纳入状态转移函数：
+
+\[
+q_{t+1}=\delta(q_t,y_t), \qquad \delta(q_t,y_t)\neq \bot,
+\]
+
+则生成结果不仅满足文本语法，还满足 TVM AutoScheduler 的局部可回放约束。这与 `eval_struct.py` 中的 `parse_valid_rate`、`build_valid_rate` 指标直接对应。
+
 ## 创新点 1：语法约束下的张量程序生成（Grammar-Constrained Tensor Program Generation）
 
 ### 1.1 动机
@@ -99,6 +263,60 @@ Ablation：
 
 - 工作量：**2–3 周**（扩词表 + 重建数据 + 单元测试 + grammar processor + ablation）
 - 风险：方案 C 要对 auto_scheduler 合法性规则做剥离，阅读 TVM C++ 代码有一定成本。若时间紧张可只做到方案 B。
+
+### 1.6 可行性推导：从非法采样到受约束采样
+
+设未约束模型一次生成合法 suffix 的概率为 \(p_{\text{valid}}\)，每个 workload 需要保留 \(K\) 个可用候选，模型最多尝试 \(R\) 次。若每次生成近似独立，则至少获得一个合法候选的概率为：
+
+\[
+P_{\ge 1}=1-(1-p_{\text{valid}})^R.
+\]
+
+当 \(p_{\text{valid}}\) 较低时，需要较大的 \(R\) 才能避免 fallback。引入 grammar-constrained decoding 后，语法合法概率被提升到：
+
+\[
+p_{\text{syntax}}^G=1.
+\]
+
+此时剩余失败主要来自 TVM 局部语义和 build 阶段，可分解为：
+
+\[
+\begin{aligned}
+p_{\text{valid}}^G
+&=
+p_{\text{syntax}}^G\cdot p_{\text{semantic}}\cdot p_{\text{build}}
+\\
+&=
+p_{\text{semantic}}\cdot p_{\text{build}}.
+\end{aligned}
+\]
+
+这说明语法约束并不直接保证 latency 最优，但它能显著减少无效样本，使有限生成预算更多用于探索可构建 schedule。`eval_struct.py` 中的指标可写成：
+
+\[
+\begin{aligned}
+\text{parse\_valid\_rate}
+&=
+\frac{N_{\text{parsed}}}{N_{\text{generated}}},
+\qquad
+\text{build\_valid\_rate}
+&=
+\frac{N_{\text{built-ok}}}{N_{\text{built}}}.
+\end{aligned}
+\]
+
+因此，创新点 1 的可行性不依赖“LLM 完全理解编译器”，而是通过显式语法先验把搜索空间从 \(\mathcal{V}^n\) 收缩到 \(\mathcal{L}_G\)。若词表大小为 \(|\mathcal{V}|\)，平均每步合法 token 数为 \(\bar{a}\)，则长度为 \(n\) 的候选空间从近似 \(|\mathcal{V}|^n\) 降为：
+
+\[
+\begin{aligned}
+|\mathcal{S}_{G,n}|\approx \prod_{t=1}^{n}|\mathcal{A}_G(y_{<t})|
+&\approx \bar{a}^{\,n},
+\qquad
+\bar{a}\ll |\mathcal{V}|.
+\end{aligned}
+\]
+
+这为结构合法率和生成效率提升提供了直接理论解释。
 
 ---
 
@@ -198,6 +416,130 @@ Ablation：
   - 真实 latency 采集耗 GPU；若无法采集，只能用合成 reward，说服力会打折。
   - Qwen3-0.6B 容量是否足够体现偏好信号：可以 fallback 到 1.5B / 3B。
 
+### 2.7 LAPO 详细公式推导
+
+对同一 prompt \(x_p=(c,p)\)，设两个候选 suffix 分别为 \(y^+\) 和 \(y^-\)，其真实延迟满足：
+
+\[
+\ell(\Phi(x_p,y^+)) < \ell(\Phi(x_p,y^-)).
+\]
+
+偏好对构造可写为：
+
+\[
+y^+=\arg\min_{y\in\mathcal{Y}(x_p)}\ell(\Phi(x_p,y)),
+\]
+
+\[
+\begin{aligned}
+y^- &\sim
+\left\{y\in\mathcal{Y}(x_p)\mid
+\frac{\ell(\Phi(x_p,y))}{\ell(\Phi(x_p,y^+))}\ge \gamma
+\right\}.
+\end{aligned}
+\]
+
+其中 \(\gamma\) 对应 `build_preference_pairs.py` 中的 `min_latency_gap_ratio`，默认可取 1.5。延迟差距定义为：
+
+\[
+r_\ell=\frac{\ell^-}{\ell^+},
+\qquad
+\Delta_\ell=\log r_\ell.
+\]
+
+DPO 将策略模型 \(\pi_\theta\) 与参考模型 \(\pi_{\text{ref}}\) 的 log-ratio 差作为隐式奖励边界：
+
+\[
+\begin{aligned}
+h_\theta(x_p,y^+,y^-)
+&=
+\left[\log\pi_\theta(y^+\mid x_p)-\log\pi_\theta(y^-\mid x_p)\right]
+\\
+&\quad-
+\left[\log\pi_{\text{ref}}(y^+\mid x_p)-\log\pi_{\text{ref}}(y^-\mid x_p)\right].
+\end{aligned}
+\]
+
+标准 DPO 损失为：
+
+\[
+\begin{aligned}
+\mathcal{L}_{\text{DPO}}(\theta)
+&=
+-\mathbb{E}_{(x_p,y^+,y^-)\sim\mathcal{D}_{\text{pref}}}
+\log\sigma(\beta h_\theta).
+\end{aligned}
+\]
+
+本文提出的 Latency-Aware Preference Optimization 将连续 latency 差距注入 pair-wise preference，定义权重函数：
+
+\[
+w(r_\ell)=1+\log r_\ell
+\]
+
+或使用裁剪线性权重：
+
+\[
+w(r_\ell)=\min(w_{\max},\max(1,r_\ell)).
+\]
+
+则 LAPO 损失为：
+
+\[
+\begin{aligned}
+\mathcal{L}_{\text{LAPO}}(\theta)
+&=
+-\mathbb{E}_{\mathcal{D}_{\text{pref}}}
+\left[
+\tilde{w}(r_\ell)\log\sigma(\beta h_\theta)
+\right],
+\end{aligned}
+\]
+
+其中 batch 内归一化权重为：
+
+\[
+\tilde{w}_i=\frac{w_i}{\frac{1}{B}\sum_{j=1}^{B}w_j+\epsilon}.
+\]
+
+该归一化对应 `train_qwen3_dpo.py` 中的 `lapo_normalize`，可以保持 batch 平均梯度尺度稳定。对单个样本求梯度，有：
+
+\[
+\begin{aligned}
+\nabla_\theta \mathcal{L}_{\text{LAPO}}
+&=
+-\tilde{w}(r_\ell)\beta
+\left(1-\sigma(\beta h_\theta)\right)
+\nabla_\theta h_\theta.
+\end{aligned}
+\]
+
+因此，延迟差距越大的偏好对具有越大的梯度权重；当模型已经能明显区分 chosen 与 rejected，即 \(h_\theta\) 较大时，\((1-\sigma(\beta h_\theta))\) 自动减小，避免过度优化容易样本。
+
+从隐式奖励角度，DPO 对 suffix 的奖励可写成：
+
+\[
+\begin{aligned}
+R_\theta(x_p,y)
+&=
+\beta\left[
+\log\pi_\theta(y\mid x_p)-\log\pi_{\text{ref}}(y\mid x_p)
+\right].
+\end{aligned}
+\]
+
+LAPO 使训练目标更强调满足：
+
+\[
+\begin{aligned}
+R_\theta(x_p,y^+)-R_\theta(x_p,y^-)
+&\propto
+\log\frac{\ell^-}{\ell^+}.
+\end{aligned}
+\]
+
+这正好把“延迟越低越好”的连续硬件反馈转化为大语言模型可优化的偏好间隔，解释了该方法比普通 SFT 更适合性能导向的自动调度。
+
 ---
 
 ## 创新点 3：LLM 引导的混合自动调优（LLM-Guided Hybrid Autotuning）
@@ -257,6 +599,69 @@ Ablation：
   - `SketchPolicy` 的回调接口对 mutation 支持可能不完整，需要少量 C++ 改动，提前评估。
   - 评估需要多个 workload + 真实硬件，时间成本高。
 
+### 3.7 混合搜索的收敛性表达
+
+设第 \(t\) 轮搜索种群为 \(\mathcal{P}_t\)，传统 Ansor 变异算子为 \(M_A\)，LLM 变异或生成算子为 \(M_L\)。混合调优可写为混合采样分布：
+
+\[
+\begin{aligned}
+q_t(s'\mid s)
+&=
+\alpha_t q_L(s'\mid s,c,p)
+\\
+&\quad+
+(1-\alpha_t)q_A(s'\mid s),
+\end{aligned}
+\]
+
+其中 \(\alpha_t\in[0,1]\) 是第 \(t\) 轮 LLM 注入比例。为了让搜索早期利用 LLM 先验、后期回到传统局部精修，可采用指数衰减：
+
+\[
+\alpha_t=\alpha_0\exp(-\lambda t).
+\]
+
+第 \(t\) 轮最优延迟定义为：
+
+\[
+L_t=\min_{s\in\cup_{i=0}^{t}\mathcal{P}_i}\ell(s;x,d).
+\]
+
+因为候选集合随迭代单调扩张，有：
+
+\[
+L_{t+1}\le L_t.
+\]
+
+LLM warm-start 的收益可表述为初始分布质量提升。设达到目标阈值 \(\ell(s)\le \eta\) 的候选集合为：
+
+\[
+\mathcal{G}_\eta=\{s\mid \ell(s;x,d)\le \eta\}.
+\]
+
+若 LLM 生成分布 \(q_L\) 对高质量区域的命中概率高于随机/传统初始化分布 \(q_A\)：
+
+\[
+\Pr_{s\sim q_L}[s\in\mathcal{G}_\eta]
+>
+\Pr_{s\sim q_A}[s\in\mathcal{G}_\eta],
+\]
+
+则在同样候选数 \(K\) 下，至少命中一次高质量 schedule 的概率为：
+
+\[
+P_{\text{hit}}(K)=1-(1-p)^K.
+\]
+
+因此 LLM warm-start 可以降低达到目标 latency 所需的 trials。论文中的 `trials-to-target` 和 `time-to-target` 可分别定义为：
+
+\[
+T_{\text{trial}}(\eta)=\min\{t\mid L_t\le \eta\},
+\]
+
+\[
+T_{\text{time}}(\eta)=\min\{\text{wall-clock time}\mid L_t\le \eta\}.
+\]
+
 ---
 
 ## 创新点 4：跨硬件迁移与小样本适配（Cross-Architecture Transfer with Per-Device Adapters）
@@ -315,6 +720,67 @@ Ablation：
 - 风险：
   - 如果 A100 / V100 测量数据质量差（latency 缺失），实验说服力下降。
   - 可以退化成只做 `4090 → V100` 单迁移路径。
+
+### 4.7 跨硬件迁移指标公式
+
+设源硬件为 \(d_s\)，目标硬件为 \(d_t\)。device-conditioned 模型学习：
+
+\[
+\pi_\theta(y\mid c,p,d).
+\]
+
+LoRA-per-Device 将目标硬件适配写成低秩增量：
+
+\[
+\begin{aligned}
+W_{d}&=W_0+\Delta W_d,
+\qquad
+\Delta W_d&=A_dB_d,
+\end{aligned}
+\]
+
+其中 \(A_d\in\mathbb{R}^{m\times r}\)，\(B_d\in\mathbb{R}^{r\times n}\)，且 \(r\ll \min(m,n)\)。因此每个硬件只需训练少量参数：
+
+\[
+|\Delta W_d|=r(m+n)\ll mn.
+\]
+
+论文中可定义 Device-Invariant Scheduling Knowledge 指标，衡量 0-shot 模型相对 full retrain 上界保留了多少性能：
+
+\[
+\begin{aligned}
+\text{DISK}(d_s\rightarrow d_t)
+&=
+\frac{
+S_{\text{zero-shot}}(d_t)-S_{\text{baseline}}(d_t)
+}{
+S_{\text{full}}(d_t)-S_{\text{baseline}}(d_t)+\epsilon
+},
+\end{aligned}
+\]
+
+其中 \(S\) 可以取 geometric mean speedup、平均 best-of-K latency 改善率或结构合法率。若用 latency 表达，建议先转为 speedup：
+
+\[
+\begin{aligned}
+S_{\text{method}}
+&=
+\operatorname{GeoMean}_{x\in\mathcal{X}}
+\frac{\ell_{\text{baseline}}(x,d_t)}
+{\ell_{\text{method}}(x,d_t)}.
+\end{aligned}
+\]
+
+Few-shot adapter 的收益可写成样本效率曲线：
+
+\[
+\begin{aligned}
+S_k(d_t)&=S(\pi_{\theta+\Delta\theta_{d_t}^{(k)}}),
+\qquad k\in\{100,500,1000\},
+\end{aligned}
+\]
+
+其中 \(k\) 是目标硬件真实 measurement 数量。若 \(S_k\) 随小样本快速接近 \(S_{\text{full}}\)，即可证明本文方法学到的调度知识具有硬件无关成分，同时 LoRA 适配能够以低成本吸收目标硬件特性。
 
 ---
 

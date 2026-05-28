@@ -18,7 +18,13 @@ import json
 import copy
 from tvm import auto_scheduler
 from tvm.auto_scheduler.measure_record import load_record_from_string
-from common import register_data_path, load_and_register_tasks, get_hold_out_five_files, get_bert_files
+from common import (
+    register_data_path,
+    load_and_register_tasks,
+    get_hold_out_five_files,
+    get_bert_files,
+    get_hold_out_files_by_workloads,
+)
 import tvm
 from functools import partial
 import shutil
@@ -89,6 +95,7 @@ class ScriptArguments:
     min_suffix_tokens: int = field(default=16, metadata={"help": "FOR_GEN 中 PPT 后最少保留的决策 token 数"})
     split_seed: int = field(default=0, metadata={"help": "FOR_GEN 文件级划分随机种子"})
     ppt_marker: str = field(default="PPT", metadata={"help": "用于定位 decision suffix 起点的 marker 字符串"})
+    eval_workloads: str = field(default=None, metadata={"help": "评估 sketch 时指定 workload，逗号分隔，例如 bert_base,resnet_50"})
 
 
 def for_clm_or_mlm(for_type):
@@ -188,6 +195,13 @@ def _concat_json_files(input_files, output_file):
                 continue
             with open(input_file, "r") as fin:
                 shutil.copyfileobj(fin, fout)
+
+
+def _parse_eval_workloads(eval_workloads):
+    if not eval_workloads:
+        return None
+    names = [name.strip() for name in eval_workloads.split(",") if name.strip()]
+    return names or None
 
 
 def for_gen_basic(lines):
@@ -868,11 +882,18 @@ def main():
             files.sort()
             print("Dataset file cnt:", len(files))
             logger.info("%s file count before hold-out=%d", script_args.for_type, len(files))
-            # 根据不同类型选择不同的预留文件
-            if script_args.for_type == FOR_GEN_EVAL_SKETCH_ONLY_BERT:
+            # 根据不同类型或显式参数选择不同的预留文件
+            eval_workloads = _parse_eval_workloads(script_args.eval_workloads)
+            if eval_workloads:
+                hold_out_files = get_hold_out_files_by_workloads(script_args.target, eval_workloads)
+                logger.info("%s selected eval_workloads=%s", script_args.for_type, eval_workloads)
+            elif script_args.for_type == FOR_GEN_EVAL_SKETCH_ONLY_BERT:
                 hold_out_files = get_bert_files(script_args.target)
+                eval_workloads = ["bert_base"]
+                logger.info("%s selected legacy only_bert workload", script_args.for_type)
             else:
                 hold_out_files = get_hold_out_five_files(script_args.target)
+                logger.info("%s selected all hold-out workloads", script_args.for_type)
             hold_out_set = set()
             for file in hold_out_files:
                 hold_out_set.add(os.path.basename(file))
@@ -884,6 +905,11 @@ def main():
             files = files_new
             print("After hold out, file cnt:", len(files))
             logger.info("%s file count after hold-out=%d", script_args.for_type, len(files))
+            if len(files) == 0:
+                raise ValueError(
+                    f"No dataset files selected for {script_args.for_type}. "
+                    f"eval_workloads={eval_workloads}, dataset_path={script_args.dataset_path}"
+                )
             # 可选：根据调度文件筛选潜在文件
             if script_args.schedule_file_path:
                 from task_sheduler import find_potential_files

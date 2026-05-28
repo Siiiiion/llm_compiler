@@ -118,6 +118,21 @@ def _parse_args():
         help="example: graph / vm",
         required=True,
     )
+    args.add_argument(
+        "--fallback-to-topi-on-missing-history",
+        type=lambda x: bool(strtobool(x)),
+        default=False,
+        help=(
+            "If True, build without auto-scheduler when TLM_LOG_FILE has no valid "
+            "measured record for one or more extracted tasks."
+        ),
+    )
+    args.add_argument(
+        "--skip-history-check",
+        type=lambda x: bool(strtobool(x)),
+        default=False,
+        help="If True, skip pre-build validation of TLM_LOG_FILE coverage.",
+    )
     parsed = args.parse_args()
     parsed.target = tvm.target.Target(parsed.target)
     parsed.input_shape = json.loads(parsed.input_shape)
@@ -133,10 +148,110 @@ def _parse_args():
 ARGS = _parse_args()
 
 
+def _valid_latency(json_line):
+    """Return the best usable latency in a measure record, or None."""
+    result = json_line.get("r")
+    if not result or len(result) < 2:
+        return None
+    costs, error_no = result[0], result[1]
+    if error_no != 0 or not costs:
+        return None
+    valid = []
+    for cost in costs:
+        try:
+            cost = float(cost)
+        except (TypeError, ValueError):
+            continue
+        if 0 < cost < 1e9:
+            valid.append(cost)
+    return min(valid) if valid else None
+
+
+def _load_history_stats(log_file):
+    """Collect total/valid record counts by auto-scheduler workload key."""
+    stats = {}
+    if not os.path.isfile(log_file):
+        raise FileNotFoundError(f"TLM_LOG_FILE does not exist: {log_file}")
+    with open(log_file, "r") as f:
+        for raw in f:
+            if not raw.strip():
+                continue
+            try:
+                json_line = json.loads(raw)
+                workload_key = json_line["i"][0][0]
+            except (KeyError, TypeError, json.JSONDecodeError):
+                continue
+            item = stats.setdefault(
+                workload_key,
+                {
+                    "total": 0,
+                    "valid": 0,
+                    "best": None,
+                },
+            )
+            item["total"] += 1
+            latency = _valid_latency(json_line)
+            if latency is not None:
+                item["valid"] += 1
+                item["best"] = latency if item["best"] is None else min(item["best"], latency)
+    return stats
+
+
+def _format_workload_key(workload_key):
+    try:
+        decoded = json.loads(workload_key)
+    except json.JSONDecodeError:
+        return workload_key
+    return f"{decoded[0]} args={decoded[1:]}"
+
+
+def _check_history_coverage(log_file, tasks, task_weights):
+    stats = _load_history_stats(log_file)
+    missing = []
+    for idx, (task, weight) in enumerate(zip(tasks, task_weights)):
+        item = stats.get(task.workload_key, {"total": 0, "valid": 0, "best": None})
+        if item["valid"] == 0:
+            missing.append((idx, weight, task.workload_key, item["total"]))
+
+    covered = len(tasks) - len(missing)
+    print(f"History coverage: {covered}/{len(tasks)} extracted tasks have valid latency.", flush=True)
+    if missing:
+        print("Missing valid history records:", flush=True)
+        for idx, weight, workload_key, total in missing:
+            print(
+                f"  task {idx} weight={weight} records={total} "
+                f"{_format_workload_key(workload_key)}",
+                flush=True,
+            )
+    return missing
+
+
+def _build_with_auto_scheduler(relay_build, mod, target, params, log_file):
+    with auto_scheduler.ApplyHistoryBest(log_file):
+        with tvm.transform.PassContext(
+            opt_level=3,
+            config={"relay.backend.use_auto_scheduler": True},
+        ):
+            return relay_build(
+                mod,
+                target=target,
+                params=params,
+            )
+
+
+def _build_with_topi(relay_build, mod, target, params):
+    with tvm.transform.PassContext(opt_level=3):
+        return relay_build(
+            mod,
+            target=target,
+            params=params,
+        )
+
+
 def main():
     # log_file = os.path.join(ARGS.work_dir, f"{ARGS.workload}.json")
     log_file = os.environ['TLM_LOG_FILE']
-    print(log_file)
+    print(log_file, flush=True)
 
     # runner = auto_scheduler.RPCRunner(
     #     key=ARGS.rpc_key,
@@ -175,7 +290,7 @@ def main():
     runner = auto_scheduler.LocalRunner(repeat=10, enable_cpu_cache_flush=enable_cpu_cache_flush, number=1, timeout=5)
 
     # describe()
-    print(f"Workload: {ARGS.workload}")
+    print(f"Workload: {ARGS.workload}", flush=True)
     mod, params, (input_name, input_shape, input_dtype) = get_network(
         ARGS.workload,
         ARGS.input_shape,
@@ -228,16 +343,28 @@ def main():
 
         relay_build = {"graph": relay.build, "vm": relay.vm.compile}[ARGS.backend]
         with ms.Profiler.timeit("PostTuningCompilation"):
-            with auto_scheduler.ApplyHistoryBest(log_file):
-                with tvm.transform.PassContext(
-                    opt_level=3,
-                    config={"relay.backend.use_auto_scheduler": True},
-                ):
-                    lib = relay_build(
-                        mod,
-                        target=ARGS.target,
-                        params=params,
-                    )
+            missing_history = []
+            if not ARGS.skip_history_check:
+                missing_history = _check_history_coverage(log_file, tasks, task_weights)
+
+            if missing_history and not ARGS.fallback_to_topi_on_missing_history:
+                raise RuntimeError(
+                    "TLM_LOG_FILE does not contain a valid measured schedule for every "
+                    "extracted task. Regenerate/remeasure the missing tasks, or rerun with "
+                    "--fallback-to-topi-on-missing-history=True to build a TOPI baseline. "
+                    "Note: records with error_no != 0, latency 0, or latency >= 1e9 do "
+                    "not count as valid history."
+                )
+
+            if missing_history:
+                print(
+                    "Falling back to TOPI for this Relay build because the auto-scheduler "
+                    "history is incomplete.",
+                    flush=True,
+                )
+                lib = _build_with_topi(relay_build, mod, ARGS.target, params)
+            else:
+                lib = _build_with_auto_scheduler(relay_build, mod, ARGS.target, params, log_file)
     print("Tuning Time:")
     print(profiler.table())
 

@@ -278,12 +278,14 @@ def worker(
                 for state in all_state_list:
                     inp = auto_scheduler.MeasureInput(inputs[0].task, state)
                     i_str = inp.to_json()
-                    if i_str in input_set:
-                        continue
-                    if allow_repeat is False and check_measured(i_str):
-                        continue
+                    if allow_repeat is False:
+                        if i_str in input_set:
+                            continue
+                        if check_measured(i_str):
+                            continue
 
-                    input_set.add(i_str)
+                    if allow_repeat is False:
+                        input_set.add(i_str)
                     measure_inputs_tmp.append(inp)
 
                 default_build_result = auto_scheduler.measure.BuildResult(None, [], 0, None, 0)

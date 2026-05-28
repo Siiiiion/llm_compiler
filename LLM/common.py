@@ -160,7 +160,11 @@ def hold_out_task_files(target, only_bert=False):
         files = {
             "resnet_50": get_task_info_filename(('resnet_50', [1,3,224,224]), target),
             "mobilenet_v2": get_task_info_filename(('mobilenet_v2', [1,3,224,224]), target),
+            "mobilenet_v3": get_task_info_filename(('mobilenet_v3', [1,3,224,224]), target),
+
             "resnext_50": get_task_info_filename(('resnext_50', [1,3,224,224]), target),
+            "vgg_16": get_task_info_filename(('vgg_16', [1,3,224,224]), target),
+
             "bert_base": get_task_info_filename(('bert_base', [1,128]), target),
             "bert_tiny": get_task_info_filename(('bert_tiny', [1,128]), target),
             
@@ -173,16 +177,40 @@ def hold_out_task_files(target, only_bert=False):
     return files
 
 
-def yield_hold_out_five_files(target, only_bert=False):
+def hold_out_task_files_by_workloads(target, workload_names):
+    """按 workload 名称筛选留出评测任务文件。
+
+    参数:
+        target: TVM 目标对象。
+        workload_names: 需要保留的 workload 名称列表，例如 ``["bert_base"]``。
+    返回:
+        字典，键为模型名，值为对应任务文件路径。
+    """
+    files = hold_out_task_files(target)
+    workload_names = [name.strip() for name in workload_names if name and name.strip()]
+    unknown = sorted(set(workload_names) - set(files))
+    if unknown:
+        available = ", ".join(sorted(files))
+        raise ValueError(
+            f"Unknown hold-out workload(s): {unknown}. Available workloads: {available}"
+        )
+    return {name: files[name] for name in workload_names}
+
+
+def yield_hold_out_five_files(target, only_bert=False, workload_names=None):
     """遍历留出任务并逐条产出任务信息。
 
     参数:
         target: TVM 目标对象。
         only_bert: 为 ``True`` 时仅处理 BERT 任务。
+        workload_names: 可选，仅处理指定 workload 名称。
     返回:
         生成器，元素为 ``(workload, task, record_file, weight)``。
     """
-    files = hold_out_task_files(target, only_bert=only_bert)
+    if workload_names is not None:
+        files = hold_out_task_files_by_workloads(target, workload_names)
+    else:
+        files = hold_out_task_files(target, only_bert=only_bert)
 
     for workload, file in files.items():
         tasks_part, task_weights = pickle.load(open(file, "rb"))
@@ -212,5 +240,15 @@ def get_bert_files(target):
         排序后的去重文件路径列表。
     """
     files = list(set([it[2] for it in list(yield_hold_out_five_files(target, True))]))
+    files.sort()
+    return files
+
+
+def get_hold_out_files_by_workloads(target, workload_names):
+    """收集指定 workload 对应的测量记录文件列表。"""
+    files = list(set([it[2] for it in list(yield_hold_out_five_files(
+        target,
+        workload_names=workload_names,
+    ))]))
     files.sort()
     return files
