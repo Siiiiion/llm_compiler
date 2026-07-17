@@ -19,13 +19,13 @@
     # 跑真正的 DPO（默认）
     PREFERENCE_DATASET=~/workspace/gen_data/4090_prefs \
     POLICY_MODEL_PATH=~/huggingface/model/Qwen3-0.6B-4090-struct-stage1 \
-    python3 run_train_qwen3_dpo.py
+    python3 train/run_train_qwen3_dpo.py
 
     # 只跑 SFT 基线（不训 DPO，用于消融）
-    USE_DPO=false python3 run_train_qwen3_dpo.py
+    USE_DPO=false python3 train/run_train_qwen3_dpo.py
 
     # 跑 LAPO（Latency-Weighted DPO）
-    LAPO=true python3 run_train_qwen3_dpo.py
+    LAPO=true python3 train/run_train_qwen3_dpo.py
 """
 
 from __future__ import annotations
@@ -38,8 +38,12 @@ import subprocess
 home_dir = os.path.expanduser("~")
 workspace_dir = os.path.join(home_dir, "workspace")
 model_root_dir = os.path.join(home_dir, "huggingface", "model")
-script_basename = os.path.basename(os.path.abspath(__file__))
-log_file = os.environ.get("LOG_FILE", f"{script_basename}.log")
+script_dir = os.path.dirname(os.path.abspath(__file__))
+script_basename = os.path.basename(__file__)
+training_script = os.path.join(script_dir, "train_qwen3_dpo.py")
+log_file = os.path.abspath(
+    os.path.expanduser(os.environ.get("LOG_FILE", f"{script_basename}.log"))
+)
 session_name = os.environ.get("SESSION_NAME", script_basename.replace(".", "_"))
 torchrun_bin = os.environ.get(
     "TORCHRUN_BIN",
@@ -248,10 +252,11 @@ cmd_parts = [
     shlex.quote(torchrun_bin),
     f"--nproc_per_node={nproc_per_node}",
     f"--master_port={master_port}",
-    "train_qwen3_dpo.py",
+    shlex.quote(training_script),
     "--do_train",
 ]
-if os.path.isfile(os.path.join(preference_dataset, "validation_pairs.jsonl")):
+has_validation = os.path.isfile(os.path.join(preference_dataset, "validation_pairs.jsonl"))
+if has_validation:
     cmd_parts.append("--do_eval")
 
 cmd_parts.extend(
@@ -276,8 +281,6 @@ cmd_parts.extend(
         f"--logging_steps={logging_steps}",
         f"--num_train_epochs={num_train_epochs}",
         f"--learning_rate={learning_rate}",
-        f"--eval_strategy=steps",
-        f"--eval_steps={eval_steps}",
         f"--save_strategy=steps",
         f"--save_steps={save_steps}",
         f"--save_total_limit={save_total_limit}",
@@ -291,15 +294,18 @@ cmd_parts.extend(
     ]
 )
 
+if has_validation:
+    cmd_parts.extend(["--eval_strategy=steps", f"--eval_steps={eval_steps}"])
+else:
+    cmd_parts.append("--eval_strategy=no")
+
 if nproc_per_node > 1:
     cmd_parts.append("--ddp_find_unused_parameters=False")
 if warmup_steps:
     cmd_parts.append(f"--warmup_steps={warmup_steps}")
 else:
     cmd_parts.append(f"--warmup_ratio={warmup_ratio}")
-if load_best_model_at_end and os.path.isfile(
-    os.path.join(preference_dataset, "validation_pairs.jsonl")
-):
+if load_best_model_at_end and has_validation:
     cmd_parts.extend(
         [
             "--load_best_model_at_end=True",
@@ -319,27 +325,29 @@ train_cmd = f"CUDA_VISIBLE_DEVICES={cuda_visible_devices} " + " ".join(cmd_parts
 print("[run_train_qwen3_dpo] launching command:")
 print(train_cmd)
 
-cmd = """tmux new -s %s -d '{
+run_summary = (
+    f"training_mode={training_mode} policy={policy_model_path} "
+    f"ref={ref_model_path} prefs={preference_dataset}"
+)
+session_command = """
+set -o pipefail
 {
 set -x
 echo "#################################################################"
 date
-echo "training_mode=%s policy=%s ref=%s prefs=%s"
+echo %s
 
 export PYTHONUNBUFFERED=1
 %s
 
 date
 } |& tee -a %s
-}'
-""" % (
-    session_name,
-    training_mode,
-    policy_model_path,
-    ref_model_path,
-    preference_dataset,
-    train_cmd,
-    log_file,
-)
+""" % (shlex.quote(run_summary), train_cmd, shlex.quote(log_file))
 
-subprocess.Popen(cmd, shell=True)
+subprocess.run(
+    ["tmux", "new-session", "-d", "-s", session_name, session_command],
+    check=True,
+    cwd=script_dir,
+)
+print(f"[run_train_qwen3_dpo] tmux session started: {session_name}")
+print(f"[run_train_qwen3_dpo] log file: {log_file}")

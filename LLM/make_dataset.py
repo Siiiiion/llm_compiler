@@ -96,6 +96,10 @@ class ScriptArguments:
     split_seed: int = field(default=0, metadata={"help": "FOR_GEN 文件级划分随机种子"})
     ppt_marker: str = field(default="PPT", metadata={"help": "用于定位 decision suffix 起点的 marker 字符串"})
     eval_workloads: str = field(default=None, metadata={"help": "评估 sketch 时指定 workload，逗号分隔，例如 bert_base,resnet_50"})
+    network_info_dir: str = field(default=None, metadata={"help": "覆盖 target 推导出的 network_info 目录"})
+    to_measure_program_dir: str = field(default=None, metadata={"help": "覆盖 target 推导出的 to_measure_programs 目录"})
+    measure_record_dir: str = field(default=None, metadata={"help": "覆盖 target 推导出的 measure_records 目录"})
+    skip_hold_out: bool = field(default=False, metadata={"help": "跳过内置 hold-out workload 过滤"})
 
 
 def for_clm_or_mlm(for_type):
@@ -676,7 +680,12 @@ def main():
 
     # Load task registry
     print("Load all tasks...")
-    register_data_path(script_args.target)
+    register_data_path(
+        script_args.target,
+        network_info_folder=script_args.network_info_dir,
+        to_measure_program_folder=script_args.to_measure_program_dir,
+        measure_record_folder=script_args.measure_record_dir,
+    )
     script_args.target = tvm.target.Target(script_args.target)
     tasks = load_and_register_tasks()
     logger.info("Task registry loaded for target=%s", script_args.target)
@@ -912,11 +921,15 @@ def main():
                 )
             # 可选：根据调度文件筛选潜在文件
             if script_args.schedule_file_path:
-                from task_sheduler import find_potential_files
+                from task_scheduler import find_potential_files
 
-                files = find_potential_files(files)
+                files = find_potential_files(files, script_args.schedule_file_path)
                 print("Find potential file cnt:", len(files))
                 logger.info("%s potential file count=%d", script_args.for_type, len(files))
+                if not files:
+                    raise ValueError(
+                        f"Scheduler selected no files: {script_args.schedule_file_path}"
+                    )
             # 处理文件
             filename, _ = token_files_and_merge(
                 script_args.for_type,
@@ -933,7 +946,7 @@ def main():
             print("Dataset file cnt:", len(files))
             logger.info("FOR_GEN_TRAIN_SKETCH file count before hold-out=%d", len(files))
             # 排除预留的测试文件
-            hold_out_files = get_hold_out_five_files(script_args.target)
+            hold_out_files = [] if script_args.skip_hold_out else get_hold_out_five_files(script_args.target)
             hold_out_set = set()
             for file in hold_out_files:
                 hold_out_set.add(os.path.basename(file))
@@ -944,22 +957,31 @@ def main():
             files = files_new
             print("After hold out, file cnt:", len(files))
             logger.info("FOR_GEN_TRAIN_SKETCH file count after hold-out=%d", len(files))
-            # if 'to_measure_programs' in files[0]:
-            files_new = []
-            for file_i, file in enumerate(files):
-                if file_i % 4 == script_args.test_file_idx % 4:
-                    files_new.append(file)
-            files = files_new
-            print(f"test_file_idx: {script_args.test_file_idx}, len files: {len(files)}")
-            logger.info(
-                "FOR_GEN_TRAIN_SKETCH test_file_idx=%s, selected file count=%d",
-                script_args.test_file_idx,
-                len(files),
-            )
-            # else:
-            #     from task_sheduler import find_potential_files
-            #     files = find_potential_files(files)
-            #     print("Find potential file cnt:", len(files))
+            if script_args.schedule_file_path:
+                from task_scheduler import find_potential_files
+
+                files = find_potential_files(files, script_args.schedule_file_path)
+                print("Find potential file cnt:", len(files))
+                logger.info(
+                    "FOR_GEN_TRAIN_SKETCH scheduler selected file count=%d",
+                    len(files),
+                )
+                if not files:
+                    raise ValueError(
+                        f"Scheduler selected no files: {script_args.schedule_file_path}"
+                    )
+            elif script_args.test_file_idx is not None:
+                files_new = []
+                for file_i, file in enumerate(files):
+                    if file_i % 4 == script_args.test_file_idx % 4:
+                        files_new.append(file)
+                files = files_new
+                print(f"test_file_idx: {script_args.test_file_idx}, len files: {len(files)}")
+                logger.info(
+                    "FOR_GEN_TRAIN_SKETCH test_file_idx=%s, selected file count=%d",
+                    script_args.test_file_idx,
+                    len(files),
+                )
             filename, _ = token_files_and_merge(
                 script_args.for_type,
                 files,

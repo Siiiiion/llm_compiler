@@ -99,7 +99,11 @@ def make_measurer(
     return measurer
 
 
-def _make_measurer_kwargs(task, target: tvm.target.Target):
+def _make_measurer_kwargs(
+    task,
+    target: tvm.target.Target,
+    run_timeout_override=None,
+):
     if target.kind.name == "llvm":
         kw = {
             "run_timeout": 5,
@@ -117,9 +121,11 @@ def _make_measurer_kwargs(task, target: tvm.target.Target):
             kw["repeat"] = 10
         else:
             kw["repeat"] = 8
+        if run_timeout_override is not None:
+            kw["run_timeout"] = run_timeout_override
         return kw
     if target.kind.name == "cuda":
-        return {
+        kw = {
             "run_timeout": 5,
             "number": 3,
             "enable_cpu_cache_flush": False,
@@ -127,6 +133,9 @@ def _make_measurer_kwargs(task, target: tvm.target.Target):
             "repeat": 1,
             "min_repeat_ms": 300,
         }
+        if run_timeout_override is not None:
+            kw["run_timeout"] = run_timeout_override
+        return kw
     raise ValueError(f"Unsupported target kind: {target.kind.name}")
 
 
@@ -178,6 +187,7 @@ def remeasure_batch(
     batch_size,
     measurer_kwargs,
     measured_path,
+    print_error_details=False,
 ):
     """把一组 MeasureInput 在 target 上跑一遍，结果追加到 measured_path。"""
     measurer_kwargs = dict(measurer_kwargs)
@@ -201,7 +211,17 @@ def remeasure_batch(
             for inp in inputs[i:end]
         ]
         print(f"    batch {i}-{end}/{len(inputs)}")
-        measurer.measure(task, empty_policy, inp_batch)
+        results = measurer.measure(task, empty_policy, inp_batch)
+        if print_error_details:
+            for batch_offset, result in enumerate(results):
+                if result.error_no == 0:
+                    continue
+                record_idx = i + batch_offset
+                print(
+                    f"[measure-error] record={record_idx} "
+                    f"error_no={result.error_no} workload={task.workload_key}"
+                )
+                print(str(result.error_msg).rstrip() or "(empty error_msg)")
 
 
 def measure_file_inplace(
@@ -211,6 +231,8 @@ def measure_file_inplace(
     batch_size: int,
     resume: bool,
     max_records: int,
+    print_error_details: bool,
+    run_timeout_override,
 ) -> dict:
     """对单个 record 文件就地补测。
 
@@ -270,7 +292,11 @@ def measure_file_inplace(
 
     # Step 3: 逐组测量，结果 append 回 path
     for wl_key, (task, inputs) in groups.items():
-        measurer_kwargs = _make_measurer_kwargs(task, target)
+        measurer_kwargs = _make_measurer_kwargs(
+            task,
+            target,
+            run_timeout_override=run_timeout_override,
+        )
         remeasure_batch(
             inputs=inputs,
             target=target,
@@ -278,6 +304,7 @@ def measure_file_inplace(
             batch_size=batch_size,
             measurer_kwargs=measurer_kwargs,
             measured_path=path,
+            print_error_details=print_error_details,
         )
 
     stats["elapsed_seconds"] = round(time.time() - t0, 2)
@@ -348,7 +375,11 @@ def legacy_single_file_mode(args, target):
 
     print(f"[legacy]  to measure: {len(to_measure_lines)} records across {len(groups)} workloads")
     for wl_key, (task, inputs) in groups.items():
-        measurer_kwargs = _make_measurer_kwargs(task, target)
+        measurer_kwargs = _make_measurer_kwargs(
+            task,
+            target,
+            run_timeout_override=args.run_timeout,
+        )
         remeasure_batch(
             inputs=inputs,
             target=target,
@@ -356,6 +387,7 @@ def legacy_single_file_mode(args, target):
             batch_size=args.batch_size,
             measurer_kwargs=measurer_kwargs,
             measured_path=measured_path,
+            print_error_details=args.print_error_details,
         )
 
 
@@ -390,8 +422,32 @@ def main():
     parser.add_argument("--target", type=str, default="cuda -model=4090")
     parser.add_argument("--target-host", type=str, default=None)
     parser.add_argument("--batch-size", type=int, default=128)
+    parser.add_argument(
+        "--run-timeout",
+        type=int,
+        default=None,
+        help="覆盖 LocalRunner timeout（秒）；大型输入可提高到 60 或更高",
+    )
     parser.add_argument("--cuda-visible", default=None,
                         help="便利选项，等价于在启动前 export CUDA_VISIBLE_DEVICES=X")
+    parser.add_argument(
+        "--network-info-dir",
+        type=str,
+        default=None,
+        help="覆盖 target 推导出的 network_info 目录，用于加载对应的 all_tasks.pkl",
+    )
+    parser.add_argument(
+        "--to-measure-program-dir",
+        type=str,
+        default=None,
+        help="覆盖 target 推导出的 to_measure_programs 目录",
+    )
+    parser.add_argument(
+        "--measure-record-dir",
+        type=str,
+        default=None,
+        help="覆盖 target 推导出的 measure_records 目录",
+    )
 
     # 目录批量模式
     parser.add_argument("--input-dir", type=str, default=None,
@@ -409,6 +465,11 @@ def main():
     parser.add_argument("--end-file-idx", type=int, default=None)
     parser.add_argument("--max-files", type=int, default=None,
                         help="最多处理多少个文件；调试用")
+    parser.add_argument(
+        "--print-error-details",
+        action="store_true",
+        help="打印每个失败 MeasureResult 的 error_no、workload 和 error_msg",
+    )
 
     # 兼容旧接口
     parser.add_argument("--to-measure-path", type=str, default=None)
@@ -433,7 +494,12 @@ def main():
         args.resume = True if batch_mode else False
 
     # 注册数据路径，加载 workload registry
-    register_data_path(args.target)
+    register_data_path(
+        args.target,
+        network_info_folder=args.network_info_dir,
+        to_measure_program_folder=args.to_measure_program_dir,
+        measure_record_folder=args.measure_record_dir,
+    )
     target = tvm.target.Target(args.target)
     print(f"[init]  target={target}, resume={args.resume}, batch_mode={batch_mode}")
     print(f"[init]  CUDA_VISIBLE_DEVICES={os.environ.get('CUDA_VISIBLE_DEVICES', '(unset)')}")
@@ -470,6 +536,8 @@ def main():
                 batch_size=args.batch_size,
                 resume=args.resume,
                 max_records=args.max_records_per_file or 0,
+                print_error_details=args.print_error_details,
+                run_timeout_override=args.run_timeout,
             )
         except Exception as exc:
             print(f"[error] failed to measure {path}: {exc}")

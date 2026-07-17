@@ -38,24 +38,32 @@ def clean_name(x):
     return x
 
 
-def register_data_path(target_str):
+def register_data_path(
+    target_str,
+    network_info_folder=None,
+    to_measure_program_folder=None,
+    measure_record_folder=None,
+):
     """根据目标字符串解析硬件型号并初始化数据目录。
 
     参数:
         target_str: 目标平台描述字符串，例如 ``llvm`` 或 ``cuda -model=v100``。
     """
     assert(isinstance(target_str, str))
-    model_list = ['i7', 'v100', 'a100', '2080', 'None', '4090']
-    for model in model_list:
-        if model in target_str:
+    model_list = ['i7', 'v100', 'a100', '2080', '4090']
+    model = None
+    for candidate in model_list:
+        if candidate in target_str:
+            model = candidate
             break
-    assert(model != 'None')
+    if model is None:
+        raise ValueError(f"Cannot infer hardware model from target: {target_str}")
 
     print(f'register data path: {model}')
     global NETWORK_INFO_FOLDER, TO_MEASURE_PROGRAM_FOLDER, MEASURE_RECORD_FOLDER, HARDWARE_PLATFORM
-    NETWORK_INFO_FOLDER = f"/data3/qsy/dataset/network_info/{model}"
-    TO_MEASURE_PROGRAM_FOLDER = f"/data3/qsy/dataset/to_measure_programs/{model}"
-    MEASURE_RECORD_FOLDER = f"/data3/qsy/dataset/measure_records/{model}"
+    NETWORK_INFO_FOLDER = network_info_folder or f"/data3/qsy/dataset/network_info/{model}"
+    TO_MEASURE_PROGRAM_FOLDER = to_measure_program_folder or f"/data3/qsy/dataset/to_measure_programs/{model}"
+    MEASURE_RECORD_FOLDER = measure_record_folder or f"/data3/qsy/dataset/measure_records/{model}"
     HARDWARE_PLATFORM = model
 
 

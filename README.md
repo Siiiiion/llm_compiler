@@ -129,6 +129,216 @@ cd gen
     --keep_cnt=48 \
     --test_file_idx=0
     ```
+  - Qwen3-0.6B seq128 ONNX workload workflow.
+
+    The Qwen3 experiment has its own workload registry. Do not use the generic
+    `network_info/4090` registry for these records. Run the following commands from
+    `/home/qsy/workspace/complier/llm_compiler/LLM`.
+
+    First, generate the sketch prompts. `--test_file_idx=0` selects the current quarter
+    of the workload files, which produces three workload groups in `0_merge.json`.
+
+    ```shell
+    cd /home/qsy/workspace/complier/llm_compiler/LLM
+
+    /home/qsy/anaconda3/envs/tlm/bin/python make_dataset.py \
+      --for_type=for_gen_train_sketch \
+      --target=nvidia/geforce-rtx-4090 \
+      --dataset_path=/home/qsy/workspace/dataset/to_measure_programs/qwen3_0_6b_seq128 \
+      --tokenizer_path=/home/qsy/huggingface/model/Qwen3-0.6B-fintuned \
+      --save_path=/home/qsy/workspace/gen_data/qwen3_0_6b_seq128_gen_train \
+      --keep_cnt=48 \
+      --test_file_idx=0 \
+      --network_info_dir=/home/qsy/workspace/dataset/network_info/qwen3_0_6b_seq128 \
+      --to_measure_program_dir=/home/qsy/workspace/dataset/to_measure_programs/qwen3_0_6b_seq128 \
+      --skip_hold_out=True
+    ```
+
+    Generate build-valid states. The command deliberately writes to the existing
+    `gen_train.json`. The implementation writes worker parts to a temporary directory and
+    atomically replaces `gen_train.json` only after every worker succeeds. With
+    `--require_full_keep_cnt=True`, a short workload leaves the old output untouched.
+    Candidates are always deduplicated within this run; `--allow_repeat=True` only allows
+    candidates that may have appeared in an older measurement round.
+
+    ```shell
+    CUDA_VISIBLE_DEVICES=0,1,2,3 \
+    /home/qsy/anaconda3/envs/tlm/bin/python gen_state.py \
+      --target=nvidia/geforce-rtx-4090 \
+      --model_name_or_path=/home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1 \
+      --sketch_path=/home/qsy/workspace/gen_data/qwen3_0_6b_seq128_gen_train/0_merge.json \
+      --save_path=/home/qsy/workspace/gen_data/qwen3_0_6b_seq128_gen_train/gen_train.json \
+      --allow_repeat=True \
+      --keep_cnt=16 \
+      --is_build=True \
+      --max_retries=20 \
+      --require_full_keep_cnt=True \
+      --do_sample=True \
+      --disable_eos_stop=False \
+      --min_gen_tokens=256 \
+      --gen_token_scale=4.0 \
+      --generation_batch_size=32 \
+      --sample_top_k=0 \
+      --sample_top_p=1.0 \
+      --sample_temperature=0.6 \
+      --network_info_dir=/home/qsy/workspace/dataset/network_info/qwen3_0_6b_seq128
+    ```
+
+    Generation statistics are written next to the output as
+    `gen_train.json.stats.json`. Inspect each workload before measurement:
+
+    ```shell
+    jq '.workloads[] | {
+      workload_key,
+      generation_rounds,
+      parsed_states,
+      build_attempted,
+      build_valid,
+      build_error_counts,
+      duplicates,
+      unique_accepted,
+      kept,
+      shortfall
+    }' /home/qsy/workspace/gen_data/qwen3_0_6b_seq128_gen_train/gen_train.json.stats.json
+
+    wc -l /home/qsy/workspace/gen_data/qwen3_0_6b_seq128_gen_train/gen_train.json
+    ```
+
+    For three workloads and `keep_cnt=16`, the expected output is 48 unique,
+    build-valid records. If the strict run reports a shortfall, inspect the statistics and
+    retry with `--max_retries=40`; do not disable build validation to fill the count.
+
+    Measure the generated states on one exclusive RTX 4090. This overwrites the old
+    `measured_gen_train.json`, which is required because it refers to the previous
+    `gen_train.json` candidates.
+
+    ```shell
+    CUDA_VISIBLE_DEVICES=3 \
+    /home/qsy/anaconda3/envs/tlm/bin/python measure_programs.py \
+      --batch-size=64 \
+      --target=nvidia/geforce-rtx-4090 \
+      --network-info-dir=/home/qsy/workspace/dataset/network_info/qwen3_0_6b_seq128 \
+      --to-measure-path=/home/qsy/workspace/gen_data/qwen3_0_6b_seq128_gen_train/gen_train.json \
+      --measured-path=/home/qsy/workspace/gen_data/qwen3_0_6b_seq128_gen_train/measured_gen_train.json \
+      --no-resume
+    ```
+
+    Validate the measurement file:
+
+    ```shell
+    jq -s '{
+      total: length,
+      valid: ([.[] | select(
+        (.r[1] == 0) and any(.r[0][]; . > 0 and . < 1000000000)
+      )] | length),
+      errors: (group_by(.r[1]) | map({error_no: .[0].r[1], count: length}))
+    }' /home/qsy/workspace/gen_data/qwen3_0_6b_seq128_gen_train/measured_gen_train.json
+    ```
+
+    A cost of `1e10` is TVM's failure sentinel, not latency. Such a record has a non-zero
+    `r[1]` error code and must not be used for tuning or training.
+
+    For workloads with very large inputs, such as an FP16 vocabulary projection with a
+    roughly 500 MiB weight tensor, the default five-second `LocalRunner` timeout can expire
+    while the runner prepares inputs. Diagnose one record before treating `error_no=4` as an
+    invalid CUDA schedule:
+
+    ```shell
+    CUDA_VISIBLE_DEVICES=3 \
+    /home/qsy/anaconda3/envs/tlm/bin/python measure_programs.py \
+      --batch-size=1 \
+      --run-timeout=60 \
+      --print-error-details \
+      --target=nvidia/geforce-rtx-4090 \
+      --network-info-dir=/path/to/network_info \
+      --to-measure-path=/path/to/candidates.json \
+      --measured-path=/path/to/measured_candidates.json \
+      --no-resume
+    ```
+
+    A printed `TimeoutError` means the runner deadline was too short. Increase
+    `--run-timeout`; do not fabricate or relabel the failed record. CUDA launch, allocation,
+    and correctness errors require separate investigation even though they may share error
+    number 4.
+
+    To choose workloads for the next generation round, run the Qwen-aware task scheduler:
+
+    ```shell
+    /home/qsy/anaconda3/envs/tlm/bin/python task_scheduler.py \
+      --target=nvidia/geforce-rtx-4090 \
+      --network_info_dir=/home/qsy/workspace/dataset/network_info/qwen3_0_6b_seq128 \
+      --to_measure_program_dir=/home/qsy/workspace/dataset/to_measure_programs/qwen3_0_6b_seq128 \
+      --history_files=/home/qsy/workspace/gen_data/qwen3_0_6b_seq128_gen_train/measured_gen_train.json \
+      --output_path=/home/qsy/workspace/gen_data/qwen3_0_6b_seq128_gen_train/task_scheduler_4090.pkl \
+      --top_k=3 \
+      --records_per_task=16
+    ```
+
+    Do not run the legacy `gen/postprocess.py` for this Qwen workflow. It reads file paths
+    from `gen/utils.json` and deletes the existing JSON files under the generic
+    `measure_records/4090` directory before rebuilding them.
+
+  - Whole-model Relay/ONNX benchmark (model-independent).
+
+    `LLM/benchmark_relay.py` measures the same fixed-shape graph in two modes:
+    TVM Default (`opt_level=3`) and AutoScheduler (`ApplyHistoryBest`). It generates one
+    shared input set, checks every optimized output against the baseline, excludes compile
+    time from inference timing, and writes task coverage, compile time, timing samples,
+    correctness, error percentiles, RMSE, cosine similarity, logits argmax agreement, and
+    whole-model speedup to a JSON report. Optimized benchmarking is refused
+    unless every task extracted from the exact Relay module has at least one valid history
+    record. `error_no != 0`, zero cost, and costs at or above `1e9` seconds are invalid.
+
+    For Qwen3-0.6B seq128, run this only after the measured history covers all 11 extracted
+    tasks. The existing Qwen Relay artifact is an old-format artifact with an empty parameter
+    dictionary and remains supported:
+
+    ```shell
+    cd /home/qsy/workspace/complier/llm_compiler/LLM
+
+    CUDA_VISIBLE_DEVICES=3 \
+    /home/qsy/anaconda3/envs/tlm/bin/python benchmark_relay.py \
+      --relay-pickle='/home/qsy/workspace/dataset/network_info/qwen3_0_6b_seq128/(onnx_qwen3_0_6b_seq128,[(attention_mask,[1,128]),(input_ids,[1,128])]).relay.pkl' \
+      --history=/home/qsy/workspace/gen_data/qwen3_0_6b_seq128_gen_train/measured_gen_train.json \
+      --target=nvidia/geforce-rtx-4090 \
+      --baseline-lib=/home/qsy/workspace/gen_data/qwen3_0_6b_seq128_gen_train/qwen3_default.so \
+      --optimized-lib=/home/qsy/workspace/gen_data/qwen3_0_6b_seq128_gen_train/qwen3_autoscheduler.so \
+      --report=/home/qsy/workspace/gen_data/qwen3_0_6b_seq128_gen_train/whole_model_benchmark.json \
+      --warmup=5 \
+      --number=1 \
+      --repeat=10 \
+      --min-repeat-ms=500
+    ```
+
+    `--baseline-lib` and `--optimized-lib` are caches: a missing file is built and exported;
+    an existing file is loaded without recompilation. Delete or choose new cache paths after
+    changing the model, target, TVM build, or tuning history. The reported whole-model speedup
+    is `baseline median latency / optimized median latency`.
+
+    Any fixed-shape ONNX model can be benchmarked directly. Multiple input shapes and dtypes
+    are JSON maps, so this is not tied to Qwen input names:
+
+    ```shell
+    CUDA_VISIBLE_DEVICES=0 \
+    /home/qsy/anaconda3/envs/tlm/bin/python benchmark_relay.py \
+      --onnx-model=/path/to/model.onnx \
+      --input-shapes='{"tokens":[1,128],"mask":[1,128]}' \
+      --input-dtypes='{"tokens":"int64","mask":"int64"}' \
+      --history=/path/to/measured_history.json \
+      --target=nvidia/geforce-rtx-4090 \
+      --report=/path/to/whole_model_benchmark.json
+    ```
+
+    Use `--input-npz=/path/to/inputs.npz` when generated inputs are not semantically valid for
+    a model. The NPZ must contain exactly one correctly shaped and typed array per model input.
+    `--mode=baseline` or `--mode=optimized` can run one side independently. The escape hatch
+    `--allow-incomplete-history` permits AutoScheduler fallback schedules, but its result is
+    not a valid full-coverage tuning speedup and should not be used for the final comparison.
+
+    New Relay artifacts written by `gen/dump_network_info.py` use a versioned format and retain
+    the actual serialized parameter bytes. Older artifacts stored only the parameter byte
+    count; they are usable only when that count denotes an empty parameter dictionary. For a
+    non-empty legacy artifact, re-dump from the original model with `--overwrite-relay`.
   - Use TLM-base/TLM to generate tensor programs, `--model_name_or_path` specifies whether to use TLM-base or TLM.
     ```shell
     nohup bash -lc '

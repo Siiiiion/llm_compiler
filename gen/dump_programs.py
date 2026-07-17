@@ -23,19 +23,20 @@ from common import register_data_path, load_and_register_tasks, get_to_measure_f
 import tvm
 
 
-def dump_program(task, size, max_retry_iter=5):
+def dump_program(task, size, output_dir=None, max_retry_iter=5):
     """为指定任务生成并保存程序状态
 
     参数:
         task: TVM自动调度器任务对象
         size: 要生成的唯一状态数量
+        output_dir: 可选的输出目录，默认使用common.py中注册的数据目录
         max_retry_iter: 最大重试迭代次数，当连续没有新状态产生时
     
     返回值:
         无，但会将生成的状态保存到文件
     """
     # 获取要保存的文件名
-    filename = get_to_measure_filename(task)
+    filename = get_to_measure_filename(task, output_dir)
     # 如果文件已存在，则直接返回
     if os.path.exists(filename):
         return
@@ -108,10 +109,31 @@ if __name__ == "__main__":
     parser.add_argument("--end-idx", type=int, help='要处理的最后一个任务的索引+1')
     parser.add_argument("--size", type=int, default=1000, help='为每个任务生成的状态数量，默认1000')
     parser.add_argument("--target", type=str, required=True, help='目标硬件平台，例如"cuda"或"llvm"')
+    parser.add_argument(
+        "--hardware-name",
+        type=str,
+        help='数据目录使用的硬件名称。target不包含i7/v100/a100/2080/4090时必须指定。',
+    )
+    parser.add_argument(
+        "--network-info-dir",
+        type=str,
+        help='网络信息输入目录，默认使用/data3/qsy/dataset/network_info/{hardware-name}',
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default='/home/qsy/workspace/dataset/to_measure_programs/4090',
+        help='待测量程序的输出目录，默认使用/data3/qsy/dataset/to_measure_programs/{model}',
+    )
     args = parser.parse_args()
 
     # 注册数据路径
-    register_data_path(args.target)
+    register_data_path(
+        args.target,
+        hardware_name=args.hardware_name,
+        network_info_folder=args.network_info_dir,
+        to_measure_program_folder=args.output_dir,
+    )
     # 将目标字符串转换为TVM目标对象
     args.target = tvm.target.Target(args.target)
     # 加载并注册所有任务
@@ -123,6 +145,5 @@ if __name__ == "__main__":
 
     # 为所有任务生成并保存程序状态
     for task in tqdm(tasks[start_idx:end_idx]):
-        dump_program(task, size=args.size)
-        gc.collect()  # 回收内存，避免内存泄漏
-
+        dump_program(task, size=args.size, output_dir=args.output_dir)
+        gc.collect()  # 回收内存，避免内存泄漏|

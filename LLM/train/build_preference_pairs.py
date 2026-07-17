@@ -26,10 +26,17 @@ import math
 import os
 import random
 import shutil
+import sys
 import time
 from dataclasses import dataclass, field
 from multiprocessing import Pool
 from typing import Dict, List, Optional, Tuple
+
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+LLM_DIR = os.path.dirname(SCRIPT_DIR)
+if LLM_DIR not in sys.path:
+    sys.path.insert(0, LLM_DIR)
 
 from transformers import HfArgumentParser, set_seed
 
@@ -427,7 +434,7 @@ def main():
     logger.info("Discovered %d measurement files", len(files))
 
     if args.drop_hold_out_workloads:
-        hold_out = {os.path.basename(f) for f in get_hold_out_five_files(args.target)}
+        hold_out = {os.path.basename(f) for f in get_hold_out_five_files(tvm_target)}
         files = [f for f in files if os.path.basename(f) not in hold_out]
         logger.info("After dropping hold-out workloads: %d files", len(files))
 

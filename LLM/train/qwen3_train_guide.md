@@ -852,7 +852,7 @@ CUDA_VISIBLE_DEVICES=0 /home/qsy/anaconda3/envs/tlm/bin/python measure_programs.
 ```bash
 cd /home/qsy/workspace/complier/llm_compiler/LLM
 
-/home/qsy/anaconda3/envs/tlm/bin/python build_preference_pairs.py \
+/home/qsy/anaconda3/envs/tlm/bin/python train/build_preference_pairs.py \
   --target "cuda -model=4090" \
   --dataset_path /data3/qsy/dataset/measure_records/4090 \
   --save_path /home/qsy/workspace/gen_data/4090_prefs \
@@ -925,7 +925,7 @@ MAX_LENGTH=1024 \
 LOG_FILE=run_train_dpo_v2_ext.log \
 SESSION_NAME=qwen3_dpo_v2_ext \
 DELETE_LOG_IF_EXISTS=1 \
-/home/qsy/anaconda3/envs/tlm/bin/python run_train_qwen3_dpo.py
+/home/qsy/anaconda3/envs/tlm/bin/python train/run_train_qwen3_dpo.py
 ```
 
 **(b) 关闭 DPO，只做 SFT 基线（用于消融对比）**
@@ -935,7 +935,7 @@ DELETE_LOG_IF_EXISTS=1 \
 USE_DPO=false \
 OUTPUT_DIR=/home/qsy/huggingface/model/Qwen3-0.6B-4090-sft-baseline-v2-ext \
 SESSION_NAME=qwen3_sft_baseline_v2_ext \
-/home/qsy/anaconda3/envs/tlm/bin/python run_train_qwen3_dpo.py
+/home/qsy/anaconda3/envs/tlm/bin/python train/run_train_qwen3_dpo.py
 ```
 
 此时脚本会：不加载 ref_model、不做偏好损失，只把 `chosen` suffix 当作监督目标做标准 CLM，相当于一个"在
@@ -951,7 +951,7 @@ LAPO_WEIGHT_CLIP=10.0 \
 LAPO_NORMALIZE=1 \
 OUTPUT_DIR=/home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v2-ext \
 SESSION_NAME=qwen3_lapo_v2_ext \
-/home/qsy/anaconda3/envs/tlm/bin/python run_train_qwen3_dpo.py
+/home/qsy/anaconda3/envs/tlm/bin/python train/run_train_qwen3_dpo.py
 ```
 
 若 `build_preference_pairs.py` 用 `--weight_strategy log_gap`（默认），LAPO 将按

@@ -13,6 +13,7 @@ import pickle
 from tvm import auto_scheduler
 import re
 import glob
+import os
 
 
 # 数据路径全局变量
@@ -38,30 +39,49 @@ def clean_name(x):
     x = x.replace(" ", "")  # 移除空格
     x = x.replace("\"", "")  # 移除双引号
     x = x.replace("'", "")  # 移除单引号
+    x = x.replace("/", "_")  # 避免输入名中的路径分隔符影响文件路径
     return x
 
 
-def register_data_path(target_str):
+def register_data_path(
+    target_str,
+    hardware_name=None,
+    network_info_folder=None,
+    to_measure_program_folder=None,
+    measure_record_folder=None,
+):
     """根据目标平台字符串注册数据路径
 
     参数:
         target_str: 目标平台字符串，如"llvm"、"cuda -model=v100"
+        hardware_name: 可选的硬件/数据集名称，用于不在内置列表中的target
+        network_info_folder: 可选的网络信息目录
+        to_measure_program_folder: 可选的待测量程序目录
+        measure_record_folder: 可选的测量记录目录
     """
     assert(isinstance(target_str, str))
-    # 支持的硬件平台模型列表
-    model_list = ['i7', 'v100', 'a100', '2080', 'None', '4090']
-    # 从目标字符串中识别硬件平台
-    for model in model_list:
-        if model in target_str:
-            break
-    assert(model != 'None')  # 确保识别到了有效的硬件平台
+    if hardware_name is not None:
+        assert(isinstance(hardware_name, str))
+        if os.path.basename(hardware_name) != hardware_name:
+            raise ValueError("hardware_name should be a single path component")
+        model = hardware_name
+    else:
+        # 支持的硬件平台模型列表
+        model_list = ['i7', 'v100', 'a100', '2080', '4090']
+        # 从目标字符串中识别硬件平台
+        model = next((it for it in model_list if it in target_str), None)
+        if model is None:
+            model_match = re.search(r"-model=([^\s]+)", target_str)
+            model = model_match.group(1) if model_match else clean_name(target_str)
 
     print(f'register data path: {model}')
     # 设置全局数据路径变量
     global NETWORK_INFO_FOLDER, TO_MEASURE_PROGRAM_FOLDER, MEASURE_RECORD_FOLDER, HARDWARE_PLATFORM
-    NETWORK_INFO_FOLDER = f"/data3/qsy/dataset/network_info/{model}"  # 网络信息文件夹
-    TO_MEASURE_PROGRAM_FOLDER = f"/data3/qsy/dataset/to_measure_programs/{model}"  # 待测量程序文件夹
-    MEASURE_RECORD_FOLDER = f"/data3/qsy/dataset/measure_records/{model}"  # 测量记录文件夹
+    NETWORK_INFO_FOLDER = network_info_folder or f"/data3/qsy/dataset/network_info/{model}"
+    TO_MEASURE_PROGRAM_FOLDER = (
+        to_measure_program_folder or f"/data3/qsy/dataset/to_measure_programs/{model}"
+    )
+    MEASURE_RECORD_FOLDER = measure_record_folder or f"/data3/qsy/dataset/measure_records/{model}"
     HARDWARE_PLATFORM = model  # 硬件平台类型
 
 
@@ -127,19 +147,21 @@ def load_and_register_tasks():
     return tasks
 
 
-def get_to_measure_filename(task):
+def get_to_measure_filename(task, to_measure_program_folder=None):
     """获取待测量程序文件的保存路径
 
     参数:
         task: TVM自动调度器任务
+        to_measure_program_folder: 可选的待测量程序输出目录
     返回:
         str: 待测量程序文件路径
     """
-    assert(TO_MEASURE_PROGRAM_FOLDER is not None)
+    to_measure_program_folder = to_measure_program_folder or TO_MEASURE_PROGRAM_FOLDER
+    assert(to_measure_program_folder is not None)
     # 构建任务键
     task_key = (task.workload_key, str(task.target.kind))
     # 生成清理后的文件名并拼接路径
-    return f"{TO_MEASURE_PROGRAM_FOLDER}/{clean_name(task_key)}.json"
+    return os.path.join(to_measure_program_folder, f"{clean_name(task_key)}.json")
 
 
 def get_measure_record_filename(task, target=None):
