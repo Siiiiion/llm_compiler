@@ -13,15 +13,29 @@ SEQ_LEN="${SEQ_LEN:-128}"
 DTYPE="${DTYPE:-float16}"
 DEVICE="${DEVICE:-cuda}"
 OPSET="${OPSET:-17}"
+LOGITS_TO_KEEP="${LOGITS_TO_KEEP:-0}"
+TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-0}"
 
-OUT_DIR="${OUT_BASE}/llama3.2-1B-seq${SEQ_LEN}"
-OUT_ONNX="${OUT_DIR}/llama3_2_1b_seq${SEQ_LEN}.onnx"
+if [[ "${LOGITS_TO_KEEP}" == "1" ]]; then
+  DEFAULT_DIR_SUFFIX="-last-token"
+  DEFAULT_FILE_SUFFIX="_last_token"
+elif [[ "${LOGITS_TO_KEEP}" == "0" ]]; then
+  DEFAULT_DIR_SUFFIX=""
+  DEFAULT_FILE_SUFFIX=""
+else
+  DEFAULT_DIR_SUFFIX="-logits${LOGITS_TO_KEEP}"
+  DEFAULT_FILE_SUFFIX="_logits${LOGITS_TO_KEEP}"
+fi
+
+OUT_DIR="${OUT_DIR:-${OUT_BASE}/llama3.2-1B-seq${SEQ_LEN}${DEFAULT_DIR_SUFFIX}}"
+OUT_ONNX="${OUT_ONNX:-${OUT_DIR}/llama3_2_1b_seq${SEQ_LEN}${DEFAULT_FILE_SUFFIX}.onnx}"
+OUTPUT_DIR="$(dirname "${OUT_ONNX}")"
 
 echo "Python: ${PYTHON}"
 echo "Model: ${MODEL_DIR}"
 echo "Output: ${OUT_ONNX}"
 echo "Shape: batch=${BATCH_SIZE}, seq_len=${SEQ_LEN}"
-echo "Export: dtype=${DTYPE}, device=${DEVICE}, opset=${OPSET}"
+echo "Export: dtype=${DTYPE}, device=${DEVICE}, opset=${OPSET}, logits_to_keep=${LOGITS_TO_KEEP}"
 
 if [[ ! -x "${PYTHON}" ]]; then
   echo "ERROR: Python executable not found or not executable: ${PYTHON}" >&2
@@ -38,7 +52,13 @@ if [[ ! -d "${MODEL_DIR}" ]]; then
   exit 1
 fi
 
-mkdir -p "${OUT_DIR}"
+mkdir -p "${OUTPUT_DIR}"
+
+if [[ "${TRUST_REMOTE_CODE}" == "1" ]]; then
+  TRUST_FLAG=(--trust-remote-code)
+else
+  TRUST_FLAG=(--no-trust-remote-code)
+fi
 
 echo "Checking Python environment..."
 PYTHONNOUSERSITE=1 "${PYTHON}" - <<'PY'
@@ -73,7 +93,8 @@ PYTHONNOUSERSITE=1 "${PYTHON}" "${EXPORT_SCRIPT}" \
   --dtype "${DTYPE}" \
   --device "${DEVICE}" \
   --opset "${OPSET}" \
-  --no-trust-remote-code \
+  --logits-to-keep "${LOGITS_TO_KEEP}" \
+  "${TRUST_FLAG[@]}" \
   --attn-implementation eager
 
 echo "Checking exported files..."
@@ -82,5 +103,5 @@ if [[ ! -f "${OUT_ONNX}" ]]; then
   exit 1
 fi
 
-find "${OUT_DIR}" -maxdepth 1 -type f -printf "%p\t%s bytes\n" | sort
+find "${OUTPUT_DIR}" -maxdepth 1 -type f -printf "%p\t%s bytes\n" | sort
 echo "Done."

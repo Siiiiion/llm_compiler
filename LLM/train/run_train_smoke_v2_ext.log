@@ -1,0 +1,366 @@
++ echo '#################################################################'
+#################################################################
++ date
+Sat Jul 18 17:25:54 CST 2026
++ export PYTHONUNBUFFERED=1
++ PYTHONUNBUFFERED=1
++ CUDA_VISIBLE_DEVICES=0
++ /home/qsy/anaconda3/envs/tlm/bin/torchrun --nproc_per_node=1 --master_port=29531 train_qwen3_clm.py --do_train --do_eval --model_name_or_path=/home/qsy/huggingface/model/Qwen3-0.6B-tvm-ext --tokenizer_name=/home/qsy/huggingface/model/Qwen3-0.6B-tvm-ext --output_dir=/home/qsy/huggingface/model/Qwen3-0.6B-4090-smoke-v2-ext --dataset_name=/home/qsy/workspace/gen_data/4090_gen_qwen_v2_ext --per_device_train_batch_size=2 --per_device_eval_batch_size=2 --gradient_accumulation_steps=1 --logging_steps=5 --num_train_epochs=1 --remove_unused_columns=True --learning_rate=1e-5 --eval_strategy=steps --eval_steps=10 --save_strategy=steps --save_steps=20 --save_total_limit=1 --dataloader_num_workers=0 --dataloader_persistent_workers=False --bf16=True --gradient_checkpointing=False --group_by_length=False --mask_prefix_before_ppt=True --drop_samples_without_ppt=True --subsample_before_mask=True --min_suffix_tokens=16 --sample_seed=42 --report_to=none --warmup_ratio=0.03 --overwrite_output_dir --max_steps=10 --max_train_samples=2048 --max_eval_samples=256
+07/18/2026 17:26:00 - WARNING - __main__ - Process rank: 0, device: cuda:0, n_gpu: 1, distributed training: True, fp16: False, bf16: True
+07/18/2026 17:26:00 - INFO - __main__ - Training/evaluation parameters: TrainingArguments(
+_n_gpu=1,
+accelerator_config={'split_batches': False, 'dispatch_batches': None, 'even_batches': True, 'use_seedable_sampler': True, 'non_blocking': False, 'gradient_accumulation_kwargs': None, 'use_configured_state': False},
+adafactor=False,
+adam_beta1=0.9,
+adam_beta2=0.999,
+adam_epsilon=1e-08,
+auto_find_batch_size=False,
+average_tokens_across_devices=True,
+batch_eval_metrics=False,
+bf16=True,
+bf16_full_eval=False,
+data_seed=None,
+dataloader_drop_last=False,
+dataloader_num_workers=0,
+dataloader_persistent_workers=False,
+dataloader_pin_memory=True,
+dataloader_prefetch_factor=None,
+ddp_backend=None,
+ddp_broadcast_buffers=None,
+ddp_bucket_cap_mb=None,
+ddp_find_unused_parameters=None,
+ddp_timeout=1800,
+debug=[],
+deepspeed=None,
+disable_tqdm=False,
+do_eval=True,
+do_predict=False,
+do_train=True,
+eval_accumulation_steps=None,
+eval_delay=0,
+eval_do_concat_batches=True,
+eval_on_start=False,
+eval_steps=10,
+eval_strategy=steps,
+eval_use_gather_object=False,
+fp16=False,
+fp16_backend=auto,
+fp16_full_eval=False,
+fp16_opt_level=O1,
+fsdp=[],
+fsdp_config={'min_num_params': 0, 'xla': False, 'xla_fsdp_v2': False, 'xla_fsdp_grad_ckpt': False},
+fsdp_min_num_params=0,
+fsdp_transformer_layer_cls_to_wrap=None,
+full_determinism=False,
+gradient_accumulation_steps=1,
+gradient_checkpointing=False,
+gradient_checkpointing_kwargs=None,
+greater_is_better=None,
+group_by_length=False,
+half_precision_backend=auto,
+hub_always_push=False,
+hub_model_id=None,
+hub_private_repo=None,
+hub_revision=None,
+hub_strategy=every_save,
+hub_token=<HUB_TOKEN>,
+ignore_data_skip=False,
+include_for_metrics=[],
+include_inputs_for_metrics=False,
+include_num_input_tokens_seen=no,
+include_tokens_per_second=False,
+jit_mode_eval=False,
+label_names=None,
+label_smoothing_factor=0.0,
+learning_rate=1e-05,
+length_column_name=length,
+liger_kernel_config=None,
+load_best_model_at_end=False,
+local_rank=0,
+log_level=passive,
+log_level_replica=warning,
+log_on_each_node=True,
+logging_dir=/home/qsy/huggingface/model/Qwen3-0.6B-4090-smoke-v2-ext/runs/Jul18_17-26-00_zkyd-Super-Server,
+logging_first_step=False,
+logging_nan_inf_filter=True,
+logging_steps=5,
+logging_strategy=steps,
+lr_scheduler_kwargs=None,
+lr_scheduler_type=linear,
+max_grad_norm=1.0,
+max_steps=10,
+metric_for_best_model=None,
+mp_parameters=,
+neftune_noise_alpha=None,
+no_cuda=False,
+num_train_epochs=1.0,
+optim=adamw_torch,
+optim_args=None,
+optim_target_modules=None,
+output_dir=/home/qsy/huggingface/model/Qwen3-0.6B-4090-smoke-v2-ext,
+overwrite_output_dir=True,
+parallelism_config=None,
+past_index=-1,
+per_device_eval_batch_size=2,
+per_device_train_batch_size=2,
+prediction_loss_only=False,
+project=huggingface,
+push_to_hub=False,
+push_to_hub_model_id=None,
+push_to_hub_organization=None,
+push_to_hub_token=<PUSH_TO_HUB_TOKEN>,
+ray_scope=last,
+remove_unused_columns=True,
+report_to=[],
+restore_callback_states_from_checkpoint=False,
+resume_from_checkpoint=None,
+run_name=None,
+save_on_each_node=False,
+save_only_model=False,
+save_safetensors=True,
+save_steps=20,
+save_strategy=steps,
+save_total_limit=1,
+seed=42,
+skip_memory_metrics=True,
+tf32=None,
+torch_compile=False,
+torch_compile_backend=None,
+torch_compile_mode=None,
+torch_empty_cache_steps=None,
+torchdynamo=None,
+tpu_metrics_debug=False,
+tpu_num_cores=None,
+trackio_space_id=trackio,
+use_cpu=False,
+use_legacy_prediction_loop=False,
+use_liger_kernel=False,
+use_mps_device=False,
+warmup_ratio=0.03,
+warmup_steps=0,
+weight_decay=0.0,
+)
+/home/qsy/anaconda3/envs/tlm/lib/python3.10/site-packages/datasets/table.py:1427: FutureWarning: promote has been superseded by promote_options='default'.
+  table = cls._concat_blocks(blocks, axis=0)
+[INFO|tokenization_utils_base.py:2109] 2026-07-18 17:26:00,640 >> loading file vocab.json
+[INFO|tokenization_utils_base.py:2109] 2026-07-18 17:26:00,640 >> loading file merges.txt
+[INFO|tokenization_utils_base.py:2109] 2026-07-18 17:26:00,640 >> loading file tokenizer.json
+[INFO|tokenization_utils_base.py:2109] 2026-07-18 17:26:00,640 >> loading file added_tokens.json
+[INFO|tokenization_utils_base.py:2109] 2026-07-18 17:26:00,640 >> loading file special_tokens_map.json
+[INFO|tokenization_utils_base.py:2109] 2026-07-18 17:26:00,640 >> loading file tokenizer_config.json
+[INFO|tokenization_utils_base.py:2109] 2026-07-18 17:26:00,640 >> loading file chat_template.jinja
+[INFO|tokenization_utils_base.py:2380] 2026-07-18 17:26:01,088 >> Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained.
+07/18/2026 17:26:01 - INFO - __main__ - Using PPT marker id patterns: [[220, 151669], [151669, 220], [151669]]
+[INFO|configuration_utils.py:763] 2026-07-18 17:26:01,099 >> loading configuration file /home/qsy/huggingface/model/Qwen3-0.6B-tvm-ext/config.json
+[INFO|configuration_utils.py:839] 2026-07-18 17:26:01,102 >> Model config Qwen3Config {
+  "architectures": [
+    "Qwen3ForCausalLM"
+  ],
+  "attention_bias": false,
+  "attention_dropout": 0.0,
+  "bos_token_id": 151643,
+  "dtype": "bfloat16",
+  "eos_token_id": 151645,
+  "head_dim": 128,
+  "hidden_act": "silu",
+  "hidden_size": 1024,
+  "initializer_range": 0.02,
+  "intermediate_size": 3072,
+  "layer_types": [
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention"
+  ],
+  "max_position_embeddings": 40960,
+  "max_window_layers": 28,
+  "model_type": "qwen3",
+  "num_attention_heads": 16,
+  "num_hidden_layers": 28,
+  "num_key_value_heads": 8,
+  "rms_norm_eps": 1e-06,
+  "rope_scaling": null,
+  "rope_theta": 1000000,
+  "sliding_window": null,
+  "tie_word_embeddings": true,
+  "transformers_version": "4.57.6",
+  "use_cache": true,
+  "use_sliding_window": false,
+  "vocab_size": 151712
+}
+
+[WARNING|logging.py:328] 2026-07-18 17:26:01,121 >> `torch_dtype` is deprecated! Use `dtype` instead!
+[INFO|modeling_utils.py:1169] 2026-07-18 17:26:01,121 >> loading weights file /home/qsy/huggingface/model/Qwen3-0.6B-tvm-ext/model.safetensors
+[INFO|modeling_utils.py:1243] 2026-07-18 17:26:01,122 >> Will use dtype=torch.bfloat16 as defined in model's config object
+[INFO|modeling_utils.py:2341] 2026-07-18 17:26:01,123 >> Instantiating Qwen3ForCausalLM model under default dtype torch.bfloat16.
+[INFO|configuration_utils.py:986] 2026-07-18 17:26:01,124 >> Generate config GenerationConfig {
+  "bos_token_id": 151643,
+  "eos_token_id": 151645
+}
+
+[INFO|configuration_utils.py:939] 2026-07-18 17:26:01,297 >> loading configuration file /home/qsy/huggingface/model/Qwen3-0.6B-tvm-ext/generation_config.json
+[INFO|configuration_utils.py:986] 2026-07-18 17:26:01,297 >> Generate config GenerationConfig {
+  "bos_token_id": 151643,
+  "do_sample": true,
+  "eos_token_id": [
+    151645,
+    151643
+  ],
+  "pad_token_id": 151643,
+  "temperature": 0.6,
+  "top_k": 20,
+  "top_p": 0.95
+}
+
+[INFO|dynamic_module_utils.py:423] 2026-07-18 17:26:01,297 >> Could not locate the custom_generate/generate.py inside /home/qsy/huggingface/model/Qwen3-0.6B-tvm-ext.
+07/18/2026 17:26:01 - INFO - datasets.arrow_dataset - Caching indices mapping at /home/qsy/workspace/gen_data/4090_gen_qwen_v2_ext/train/cache-668a7a4a11087831.arrow
+07/18/2026 17:26:02 - INFO - __main__ - Subsampled split=train before_mask=2169636 after_subsample=2048 sample_seed=42
+07/18/2026 17:26:02 - INFO - __main__ - PPT mask split=train using precomputed 'ppt_end' column (fast path)
+Applying PPT suffix mask on train:   0%|          | 0/2048 [00:00<?, ? examples/s]07/18/2026 17:26:02 - INFO - datasets.arrow_dataset - Caching processed dataset at /home/qsy/workspace/gen_data/4090_gen_qwen_v2_ext/train/cache-0b7da2c3bdc0631e.arrow
+Applying PPT suffix mask on train:   7%|▋         | 136/2048 [00:00<00:01, 1272.56 examples/s]Applying PPT suffix mask on train:  13%|█▎        | 266/2048 [00:00<00:01, 1288.12 examples/s]Applying PPT suffix mask on train:  22%|██▏       | 453/2048 [00:00<00:01, 1261.47 examples/s]Applying PPT suffix mask on train:  29%|██▊       | 585/2048 [00:00<00:01, 1277.79 examples/s]Applying PPT suffix mask on train:  38%|███▊      | 779/2048 [00:00<00:00, 1279.69 examples/s]Applying PPT suffix mask on train:  44%|████▍     | 908/2048 [00:00<00:00, 1266.53 examples/s]Applying PPT suffix mask on train:  52%|█████▏    | 1067/2048 [00:01<00:01, 826.92 examples/s]Applying PPT suffix mask on train:  59%|█████▊    | 1199/2048 [00:01<00:00, 924.58 examples/s]Applying PPT suffix mask on train:  65%|██████▌   | 1341/2048 [00:01<00:00, 1031.20 examples/s]Applying PPT suffix mask on train:  72%|███████▏  | 1478/2048 [00:01<00:00, 1110.10 examples/s]Applying PPT suffix mask on train:  80%|███████▉  | 1638/2048 [00:01<00:00, 1233.70 examples/s]Applying PPT suffix mask on train:  90%|████████▉ | 1842/2048 [00:01<00:00, 1446.94 examples/s]Applying PPT suffix mask on train:  98%|█████████▊| 2000/2048 [00:01<00:00, 1139.25 examples/s]                                                                                               Filtering short/invalid PPT samples on train:   0%|          | 0/2048 [00:00<?, ? examples/s]07/18/2026 17:26:04 - INFO - datasets.arrow_dataset - Caching processed dataset at /home/qsy/workspace/gen_data/4090_gen_qwen_v2_ext/train/cache-3a77e37e5bc7576d.arrow
+Filtering short/invalid PPT samples on train:  49%|████▉     | 1000/2048 [00:00<00:00, 1664.59 examples/s]Filtering short/invalid PPT samples on train:  98%|█████████▊| 2000/2048 [00:01<00:00, 1684.61 examples/s]                                                                                                          07/18/2026 17:26:05 - INFO - __main__ - PPT mask split=train before=2048 after=2048 dropped=0 drop_ratio=0.0000
+07/18/2026 17:26:05 - INFO - __main__ - Loaded train split with 2048 samples
+07/18/2026 17:26:05 - INFO - datasets.arrow_dataset - Caching indices mapping at /home/qsy/workspace/gen_data/4090_gen_qwen_v2_ext/validation/cache-b0f59d562194f7ba.arrow
+07/18/2026 17:26:05 - INFO - __main__ - Subsampled split=validation before_mask=111611 after_subsample=256 sample_seed=43
+07/18/2026 17:26:05 - INFO - __main__ - PPT mask split=validation using precomputed 'ppt_end' column (fast path)
+Applying PPT suffix mask on validation:   0%|          | 0/256 [00:00<?, ? examples/s]07/18/2026 17:26:05 - INFO - datasets.arrow_dataset - Caching processed dataset at /home/qsy/workspace/gen_data/4090_gen_qwen_v2_ext/validation/cache-695ad1d9018b1294.arrow
+Applying PPT suffix mask on validation:  82%|████████▏ | 211/256 [00:00<00:00, 2086.02 examples/s]                                                                                                  Filtering short/invalid PPT samples on validation:   0%|          | 0/256 [00:00<?, ? examples/s]07/18/2026 17:26:05 - INFO - datasets.arrow_dataset - Caching processed dataset at /home/qsy/workspace/gen_data/4090_gen_qwen_v2_ext/validation/cache-d470965e6796605d.arrow
+Filtering short/invalid PPT samples on validation: 100%|██████████| 256/256 [00:00<00:00, 1788.23 examples/s]                                                                                                             07/18/2026 17:26:05 - INFO - __main__ - PPT mask split=validation before=256 after=256 dropped=0 drop_ratio=0.0000
+07/18/2026 17:26:05 - INFO - __main__ - Loaded validation split with 256 samples
+/data3/qsy/complier/llm_compiler/LLM/train/train_qwen3_clm.py:489: FutureWarning: `tokenizer` is deprecated and will be removed in version 5.0.0 for `Trainer.__init__`. Use `processing_class` instead.
+  trainer = Trainer(
+[INFO|trainer.py:699] 2026-07-18 17:26:05,789 >> max_steps is given, it will override any value given in num_train_epochs
+[INFO|trainer.py:749] 2026-07-18 17:26:05,790 >> Using auto half precision backend
+[WARNING|trainer.py:982] 2026-07-18 17:26:05,790 >> The tokenizer has new PAD/BOS/EOS tokens that differ from the model config and generation config. The model config and generation config were aligned accordingly, being updated with the tokenizer's values. Updated tokens: {'bos_token_id': None}.
+[INFO|trainer.py:2519] 2026-07-18 17:26:06,236 >> ***** Running training *****
+[INFO|trainer.py:2520] 2026-07-18 17:26:06,236 >>   Num examples = 2,048
+[INFO|trainer.py:2521] 2026-07-18 17:26:06,236 >>   Num Epochs = 1
+[INFO|trainer.py:2522] 2026-07-18 17:26:06,236 >>   Instantaneous batch size per device = 2
+[INFO|trainer.py:2525] 2026-07-18 17:26:06,237 >>   Total train batch size (w. parallel, distributed & accumulation) = 2
+[INFO|trainer.py:2526] 2026-07-18 17:26:06,237 >>   Gradient Accumulation steps = 1
+[INFO|trainer.py:2527] 2026-07-18 17:26:06,237 >>   Total optimization steps = 10
+[INFO|trainer.py:2528] 2026-07-18 17:26:06,237 >>   Number of trainable parameters = 595,820,544
+  0%|          | 0/10 [00:00<?, ?it/s][rank0]:[W reducer.cpp:1360] Warning: find_unused_parameters=True was specified in DDP constructor, but did not find any unused parameters in the forward pass. This flag results in an extra traversal of the autograd graph every iteration,  which can adversely affect performance. If your model indeed never has any unused parameters in the forward pass, consider turning this flag off. Note that this warning may be a false positive if your model has flow control causing later iterations to have unused parameters. (function operator())
+ 10%|█         | 1/10 [00:01<00:11,  1.27s/it] 20%|██        | 2/10 [00:01<00:05,  1.57it/s] 30%|███       | 3/10 [00:01<00:03,  2.32it/s] 40%|████      | 4/10 [00:01<00:02,  2.98it/s] 50%|█████     | 5/10 [00:02<00:01,  3.55it/s]                                              {'loss': 1.903, 'grad_norm': 18.125, 'learning_rate': 6.666666666666667e-06, 'epoch': 0.0}
+ 50%|█████     | 5/10 [00:02<00:01,  3.55it/s] 60%|██████    | 6/10 [00:02<00:00,  4.13it/s] 70%|███████   | 7/10 [00:02<00:00,  4.56it/s] 80%|████████  | 8/10 [00:02<00:00,  4.73it/s] 90%|█████████ | 9/10 [00:02<00:00,  4.85it/s]100%|██████████| 10/10 [00:02<00:00,  5.01it/s]                                               {'loss': 1.4918, 'grad_norm': 13.8125, 'learning_rate': 1.111111111111111e-06, 'epoch': 0.01}
+100%|██████████| 10/10 [00:02<00:00,  5.01it/s][INFO|trainer.py:4643] 2026-07-18 17:26:09,197 >> 
+***** Running Evaluation *****
+[INFO|trainer.py:4645] 2026-07-18 17:26:09,197 >>   Num examples = 256
+[INFO|trainer.py:4648] 2026-07-18 17:26:09,197 >>   Batch size = 2
+
+  0%|          | 0/128 [00:00<?, ?it/s][A
+  3%|▎         | 4/128 [00:00<00:04, 30.99it/s][A
+  6%|▋         | 8/128 [00:00<00:04, 26.76it/s][A
+  9%|▊         | 11/128 [00:00<00:04, 25.13it/s][A
+ 11%|█         | 14/128 [00:00<00:04, 24.34it/s][A
+ 13%|█▎        | 17/128 [00:00<00:04, 23.94it/s][A
+ 16%|█▌        | 20/128 [00:00<00:04, 23.68it/s][A
+ 18%|█▊        | 23/128 [00:00<00:04, 23.67it/s][A
+ 20%|██        | 26/128 [00:01<00:04, 23.88it/s][A
+ 23%|██▎       | 29/128 [00:01<00:04, 23.44it/s][A
+ 25%|██▌       | 32/128 [00:01<00:04, 23.37it/s][A
+ 27%|██▋       | 35/128 [00:01<00:03, 23.65it/s][A
+ 30%|██▉       | 38/128 [00:01<00:03, 23.20it/s][A
+ 32%|███▏      | 41/128 [00:01<00:03, 23.62it/s][A
+ 34%|███▍      | 44/128 [00:01<00:03, 23.84it/s][A
+ 37%|███▋      | 47/128 [00:01<00:03, 23.80it/s][A
+ 39%|███▉      | 50/128 [00:02<00:03, 24.35it/s][A
+ 41%|████▏     | 53/128 [00:02<00:03, 24.28it/s][A
+ 44%|████▍     | 56/128 [00:02<00:02, 24.22it/s][A
+ 46%|████▌     | 59/128 [00:02<00:02, 24.25it/s][A
+ 48%|████▊     | 62/128 [00:02<00:02, 24.15it/s][A
+ 51%|█████     | 65/128 [00:02<00:02, 23.90it/s][A
+ 53%|█████▎    | 68/128 [00:02<00:02, 24.04it/s][A
+ 55%|█████▌    | 71/128 [00:02<00:02, 23.89it/s][A
+ 58%|█████▊    | 74/128 [00:03<00:02, 24.00it/s][A
+ 60%|██████    | 77/128 [00:03<00:02, 23.88it/s][A
+ 62%|██████▎   | 80/128 [00:03<00:02, 23.84it/s][A
+ 65%|██████▍   | 83/128 [00:03<00:01, 23.95it/s][A
+ 67%|██████▋   | 86/128 [00:03<00:01, 24.11it/s][A
+ 70%|██████▉   | 89/128 [00:03<00:01, 24.02it/s][A
+ 72%|███████▏  | 92/128 [00:03<00:01, 24.20it/s][A
+ 74%|███████▍  | 95/128 [00:03<00:01, 24.07it/s][A
+ 77%|███████▋  | 98/128 [00:04<00:01, 23.91it/s][A
+ 79%|███████▉  | 101/128 [00:04<00:01, 23.75it/s][A
+ 81%|████████▏ | 104/128 [00:04<00:01, 23.86it/s][A
+ 84%|████████▎ | 107/128 [00:04<00:00, 24.11it/s][A
+ 86%|████████▌ | 110/128 [00:04<00:00, 24.36it/s][A
+ 88%|████████▊ | 113/128 [00:04<00:00, 23.98it/s][A
+ 91%|█████████ | 116/128 [00:04<00:00, 23.41it/s][A
+ 93%|█████████▎| 119/128 [00:04<00:00, 23.35it/s][A
+ 95%|█████████▌| 122/128 [00:05<00:00, 23.47it/s][A
+ 98%|█████████▊| 125/128 [00:05<00:00, 23.71it/s][A
+100%|██████████| 128/128 [00:05<00:00, 23.99it/s][A                                               
+                                                 [A{'eval_loss': 1.511083722114563, 'eval_accuracy': 0.7576110420618827, 'eval_runtime': 5.3843, 'eval_samples_per_second': 47.546, 'eval_steps_per_second': 23.773, 'epoch': 0.01}
+100%|██████████| 10/10 [00:08<00:00,  5.01it/s]
+100%|██████████| 128/128 [00:05<00:00, 23.99it/s][A
+                                                 [A[INFO|trainer.py:4309] 2026-07-18 17:26:14,581 >> Saving model checkpoint to /home/qsy/huggingface/model/Qwen3-0.6B-4090-smoke-v2-ext/checkpoint-10
+[INFO|configuration_utils.py:491] 2026-07-18 17:26:14,583 >> Configuration saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-smoke-v2-ext/checkpoint-10/config.json
+[INFO|configuration_utils.py:757] 2026-07-18 17:26:14,584 >> Configuration saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-smoke-v2-ext/checkpoint-10/generation_config.json
+[INFO|modeling_utils.py:4181] 2026-07-18 17:26:16,064 >> Model weights saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-smoke-v2-ext/checkpoint-10/model.safetensors
+[INFO|tokenization_utils_base.py:2561] 2026-07-18 17:26:16,065 >> chat template saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-smoke-v2-ext/checkpoint-10/chat_template.jinja
+[INFO|tokenization_utils_base.py:2730] 2026-07-18 17:26:16,066 >> tokenizer config file saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-smoke-v2-ext/checkpoint-10/tokenizer_config.json
+[INFO|tokenization_utils_base.py:2739] 2026-07-18 17:26:16,066 >> Special tokens file saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-smoke-v2-ext/checkpoint-10/special_tokens_map.json
+[INFO|trainer.py:2810] 2026-07-18 17:26:18,486 >> 
+
+Training completed. Do not forget to share your model on huggingface.co/models =)
+
+
+                                               {'train_runtime': 12.2488, 'train_samples_per_second': 1.633, 'train_steps_per_second': 0.816, 'train_loss': 1.6973759651184082, 'epoch': 0.01}
+100%|██████████| 10/10 [00:12<00:00,  5.01it/s]100%|██████████| 10/10 [00:12<00:00,  1.22s/it]
+[INFO|trainer.py:4309] 2026-07-18 17:26:18,488 >> Saving model checkpoint to /home/qsy/huggingface/model/Qwen3-0.6B-4090-smoke-v2-ext
+[INFO|configuration_utils.py:491] 2026-07-18 17:26:18,489 >> Configuration saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-smoke-v2-ext/config.json
+[INFO|configuration_utils.py:757] 2026-07-18 17:26:18,490 >> Configuration saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-smoke-v2-ext/generation_config.json
+[INFO|modeling_utils.py:4181] 2026-07-18 17:26:19,952 >> Model weights saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-smoke-v2-ext/model.safetensors
+[INFO|tokenization_utils_base.py:2561] 2026-07-18 17:26:19,953 >> chat template saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-smoke-v2-ext/chat_template.jinja
+[INFO|tokenization_utils_base.py:2730] 2026-07-18 17:26:19,954 >> tokenizer config file saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-smoke-v2-ext/tokenizer_config.json
+[INFO|tokenization_utils_base.py:2739] 2026-07-18 17:26:19,954 >> Special tokens file saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-smoke-v2-ext/special_tokens_map.json
+***** train metrics *****
+  epoch                    =     0.0098
+  total_flos               =    42728GF
+  train_loss               =     1.6974
+  train_runtime            = 0:00:12.24
+  train_samples            =       2048
+  train_samples_per_second =      1.633
+  train_steps_per_second   =      0.816
+07/18/2026 17:26:20 - INFO - __main__ - *** Evaluate ***
+[INFO|trainer.py:4643] 2026-07-18 17:26:20,078 >> 
+***** Running Evaluation *****
+[INFO|trainer.py:4645] 2026-07-18 17:26:20,079 >>   Num examples = 256
+[INFO|trainer.py:4648] 2026-07-18 17:26:20,079 >>   Batch size = 2
+  0%|          | 0/128 [00:00<?, ?it/s]  3%|▎         | 4/128 [00:00<00:04, 29.95it/s]  5%|▌         | 7/128 [00:00<00:04, 26.52it/s]  8%|▊         | 10/128 [00:00<00:04, 25.05it/s] 10%|█         | 13/128 [00:00<00:04, 24.29it/s] 12%|█▎        | 16/128 [00:00<00:04, 23.87it/s] 15%|█▍        | 19/128 [00:00<00:04, 23.63it/s] 17%|█▋        | 22/128 [00:00<00:04, 23.74it/s] 20%|█▉        | 25/128 [00:01<00:04, 23.65it/s] 22%|██▏       | 28/128 [00:01<00:04, 23.56it/s] 24%|██▍       | 31/128 [00:01<00:04, 23.44it/s] 27%|██▋       | 34/128 [00:01<00:03, 23.79it/s] 29%|██▉       | 37/128 [00:01<00:03, 23.36it/s] 31%|███▏      | 40/128 [00:01<00:03, 23.87it/s] 34%|███▎      | 43/128 [00:01<00:03, 24.08it/s] 36%|███▌      | 46/128 [00:01<00:03, 24.23it/s] 38%|███▊      | 49/128 [00:02<00:03, 24.18it/s] 41%|████      | 52/128 [00:02<00:03, 24.71it/s] 43%|████▎     | 55/128 [00:02<00:02, 24.67it/s] 45%|████▌     | 58/128 [00:02<00:02, 24.45it/s] 48%|████▊     | 61/128 [00:02<00:02, 24.47it/s] 50%|█████     | 64/128 [00:02<00:02, 24.19it/s] 52%|█████▏    | 67/128 [00:02<00:02, 24.31it/s] 55%|█████▍    | 70/128 [00:02<00:02, 24.12it/s] 57%|█████▋    | 73/128 [00:03<00:02, 24.38it/s] 59%|█████▉    | 76/128 [00:03<00:02, 23.89it/s] 62%|██████▏   | 79/128 [00:03<00:02, 24.25it/s] 64%|██████▍   | 82/128 [00:03<00:01, 24.04it/s] 66%|██████▋   | 85/128 [00:03<00:01, 24.19it/s] 69%|██████▉   | 88/128 [00:03<00:01, 23.97it/s] 71%|███████   | 91/128 [00:03<00:01, 24.12it/s] 73%|███████▎  | 94/128 [00:03<00:01, 24.13it/s] 76%|███████▌  | 97/128 [00:04<00:01, 23.78it/s] 78%|███████▊  | 100/128 [00:04<00:01, 23.96it/s] 80%|████████  | 103/128 [00:04<00:01, 23.77it/s] 83%|████████▎ | 106/128 [00:04<00:00, 23.97it/s] 85%|████████▌ | 109/128 [00:04<00:00, 24.64it/s] 88%|████████▊ | 112/128 [00:04<00:00, 24.50it/s] 90%|████████▉ | 115/128 [00:04<00:00, 23.75it/s] 92%|█████████▏| 118/128 [00:04<00:00, 23.25it/s] 95%|█████████▍| 121/128 [00:05<00:00, 23.41it/s] 97%|█████████▋| 124/128 [00:05<00:00, 23.56it/s] 99%|█████████▉| 127/128 [00:05<00:00, 23.82it/s]100%|██████████| 128/128 [00:05<00:00, 24.08it/s]
+***** eval metrics *****
+  epoch                   =     0.0098
+  eval_accuracy           =     0.7576
+  eval_loss               =     1.5111
+  eval_runtime            = 0:00:05.35
+  eval_samples            =        256
+  eval_samples_per_second =     47.768
+  eval_steps_per_second   =     23.884
+  perplexity              =     4.5316
++ date
+Sat Jul 18 17:26:31 CST 2026

@@ -1,6 +1,7 @@
 # Qwen3-0.6B 继续预训练指南（v2 — 对齐最新实现）
 
-> 本版指南配合仓库当前代码：动态填充、`ppt_end` 预计算、`DataCollatorForSeq2Seq`、
+> 本版指南配合仓库当前代码：动态填充、`ppt_end` 预计算、batch-time PPT mask、
+> `DataCollatorForSeq2Seq`、
 > 新的 `run_train_qwen3_clm.py` 默认值、以及新增的 `eval_struct.py`。
 > 如果你之前跑过 v1 流程，**数据集需要重建一次**才能享受 O(1) PPT 掩码带来的加速。
 
@@ -8,16 +9,16 @@
 
 ## 0. v2 变更速览（相对旧版）
 
-| 模块 | 旧实现 | 新实现 |
-| --- | --- | --- |
-| tokenize | `padding="max_length"` 静态填充到 `max_length=1024` | 只 truncation，训练/评估时由 `DataCollatorForSeq2Seq` 动态填充 |
-| PPT 掩码 | 每个 step 在 Python 里对 `input_ids` 做子序列搜索 | 数据集阶段一次性写入 `ppt_end` 列，训练时 O(1) 直接用 |
-| 数据集列 | `input_ids / attention_mask / labels` | 额外写 `ppt_end`、`length` 两列 |
-| 训练默认 | `per_device_bs=2, grad_accum=4, gradient_checkpointing=True` | `per_device_bs=8, grad_accum=1, gradient_checkpointing=False` |
-| DataLoader | `num_workers=4, persistent=False` | `num_workers=8, persistent=True`（可关） |
-| 最佳模型指标 | 只看 `eval_accuracy` | 可选 `eval_struct_parse_valid_rate` / `eval_struct_build_valid_rate` |
-| 评估 | 无结构性验证 | `eval_struct.py` 独立脚本 + `StructuralEvalCallback` |
-| tokenizer | 原生 Qwen3 BPE（`"32"` 切两段、`"SPC"` 切两段） | `extend_tokenizer.py` 扩 TVM 关键字 + 常用整数，`PPT` 升级为 special token，warm-start 子词均值 |
+| 模块         | 旧实现                                                         | 新实现                                                                                              |
+| ------------ | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| tokenize     | `padding="max_length"` 静态填充到 `max_length=1024`        | 只 truncation，训练/评估时由`DataCollatorForSeq2Seq` 动态填充                                     |
+| PPT 掩码     | 每个 step 在 Python 里对`input_ids` 做子序列搜索             | 数据集写入`ppt_end`，collator 按 batch 掩码，不生成完整 masked Arrow cache                         |
+| 数据集列     | `input_ids / attention_mask / labels`                        | 额外写`ppt_end`、`length` 两列                                                                  |
+| 训练默认     | `per_device_bs=2, grad_accum=4, gradient_checkpointing=True` | `per_device_bs=2, grad_accum=4, gradient_checkpointing=False`                                     |
+| DataLoader   | `num_workers=4, persistent=False`                            | 每 rank `num_workers=4, persistent=True`                                                           |
+| 最佳模型指标 | 只看`eval_accuracy`                                          | 可选`eval_struct_parse_valid_rate` / `eval_struct_build_valid_rate`                             |
+| 评估         | 无结构性验证                                                   | `eval_struct.py` 独立脚本 + `StructuralEvalCallback`                                            |
+| tokenizer    | 原生 Qwen3 BPE（`"32"` 切两段、`"SPC"` 切两段）            | `extend_tokenizer.py` 扩 TVM 关键字 + 常用整数，`PPT` 升级为 special token，warm-start 子词均值 |
 
 预期收益（4090 × 4、Qwen3-0.6B、bf16）：
 
@@ -28,17 +29,17 @@
 
 ## 1. 关键路径
 
-| 用途 | 路径 |
-| --- | --- |
-| 代码目录 | `/home/qsy/workspace/complier/llm_compiler/LLM` |
-| Conda Python | `/home/qsy/anaconda3/envs/tlm/bin/python` |
-| Torchrun | `/home/qsy/anaconda3/envs/tlm/bin/torchrun` |
-| 基础模型（原始） | `/home/qsy/huggingface/model/Qwen3-0.6B` |
-| 扩词表模型（§3 产物） | `/home/qsy/huggingface/model/Qwen3-0.6B-tvm-ext` |
-| 原始 measure records | `/home/qsy/workspace/dataset/to_measure_programs/4090` |
-| 新数据集（v2） | `/home/qsy/workspace/gen_data/4090_gen_qwen_v2` |
-| Stage1 输出 | `/home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2` |
-| Stage2 输出 | `/home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage2-v2` |
+| 用途                   | 路径                                                             |
+| ---------------------- | ---------------------------------------------------------------- |
+| 代码目录               | `/home/qsy/workspace/complier/llm_compiler/LLM`                |
+| Conda Python           | `/home/qsy/anaconda3/envs/tlm/bin/python`                      |
+| Torchrun               | `/home/qsy/anaconda3/envs/tlm/bin/torchrun`                    |
+| 基础模型（原始）       | `/home/qsy/huggingface/model/Qwen3-0.6B`                       |
+| 扩词表模型（§3 产物） | `/home/qsy/huggingface/model/Qwen3-0.6B-tvm-ext`               |
+| 原始 measure records   | `/home/qsy/workspace/dataset/to_measure_programs/4090`         |
+| 新数据集（v2）         | `/home/qsy/workspace/gen_data/4090_gen_qwen_v2`                |
+| Stage1 输出            | `/home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2` |
+| Stage2 输出            | `/home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage2-v2` |
 
 下文默认流程是：§3 扩词表 → §4 构建数据集 → §5 smoke → §6/§7 Stage1/2 → §8 结构性验证 → §9 生成。
 如果你暂时不想做扩词表，直接跳过 §3，把所有 `Qwen3-0.6B-tvm-ext` 当作 `Qwen3-0.6B` 使用即可。
@@ -91,11 +92,11 @@ warm-start 新 embedding，得到三重收益：
 
 脚本按三组默认值（均可用 `--no_*` 关掉或 `--extra_tokens_file` 追加）：
 
-| 组 | 内容 | 说明 |
-| --- | --- | --- |
-| step keyword | `SP FU RE CA CI CR CHR CHW RF AN PA FSP FFSP SA PPT MEM SPC ROOT` | 对应 `tvm/auto_scheduler/transform_step.cc` 的 step / marker |
-| integer const | `0..9 / 10 / 12 / 14 / 16 / 20 / 24 / 28 / 32 / 40 / 48 / 56 / 64 / 72 / 80 / 96 / 112 / 128 / ... / 4096 / -1` | 调度里常见 tile 尺寸、block/thread 数、循环上限 |
-| boolean | `True False` | 许多 annotation 的取值 |
+| 组            | 内容                                                                                                              | 说明                                                          |
+| ------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| step keyword  | `SP FU RE CA CI CR CHR CHW RF AN PA FSP FFSP SA PPT MEM SPC ROOT`                                               | 对应`tvm/auto_scheduler/transform_step.cc` 的 step / marker |
+| integer const | `0..9 / 10 / 12 / 14 / 16 / 20 / 24 / 28 / 32 / 40 / 48 / 56 / 64 / 72 / 80 / 96 / 112 / 128 / ... / 4096 / -1` | 调度里常见 tile 尺寸、block/thread 数、循环上限               |
+| boolean       | `True False`                                                                                                    | 许多 annotation 的取值                                        |
 
 脚本会自动跳过已经是单 token 的字符串（`add_tokens` 否则会是无效操作或 id 冲突）。
 所有真正新加的 token 都会在 `extend_tokenizer_manifest.json` 里列出。
@@ -114,15 +115,15 @@ cd /home/qsy/workspace/complier/llm_compiler/LLM
 
 可选参数：
 
-| 参数 | 作用 | 默认 |
-| --- | --- | --- |
-| `--base_model` | 原始 Qwen3 模型 / tokenizer 目录 | 必填 |
-| `--output_dir` | 扩词表后的输出目录 | 必填 |
-| `--promote_marker` | 把给定字符串加为 **special token**（推荐 `PPT`） | 空 |
-| `--extra_tokens_file` | 追加每行一个 token 的自定义列表文件 | 空 |
-| `--no_steps` / `--no_ints` / `--no_bool` | 关掉对应组 | 全开 |
-| `--pad_to_multiple_of` | resize 后把 embedding 行数 pad 到该倍数（TensorCore 友好） | `8` |
-| `--dry_run` | 只打印将要新增的 token，不写磁盘 | 关 |
+| 参数                                           | 作用                                                       | 默认  |
+| ---------------------------------------------- | ---------------------------------------------------------- | ----- |
+| `--base_model`                               | 原始 Qwen3 模型 / tokenizer 目录                           | 必填  |
+| `--output_dir`                               | 扩词表后的输出目录                                         | 必填  |
+| `--promote_marker`                           | 把给定字符串加为**special token**（推荐 `PPT`）    | 空    |
+| `--extra_tokens_file`                        | 追加每行一个 token 的自定义列表文件                        | 空    |
+| `--no_steps` / `--no_ints` / `--no_bool` | 关掉对应组                                                 | 全开  |
+| `--pad_to_multiple_of`                       | resize 后把 embedding 行数 pad 到该倍数（TensorCore 友好） | `8` |
+| `--dry_run`                                  | 只打印将要新增的 token，不写磁盘                           | 关    |
 
 首次使用建议先 `--dry_run` 检查实际会新增多少 token，再去掉它正式保存。
 
@@ -175,13 +176,13 @@ PY
 
 每个样本落盘后会包含：
 
-| 列名 | 类型 | 说明 |
-| --- | --- | --- |
-| `input_ids` | `List[int]` | 原始 token ids，**不再静态 pad** |
-| `attention_mask` | `List[int]` | 动态长度，与 `input_ids` 对齐 |
-| `labels` | `List[int]` | = `input_ids.copy()`；训练时 PPT 前会被改写为 `-100` |
-| `length` | `int` | `len(input_ids)`，`group_by_length=True` 时可加速 batching |
-| `ppt_end` | `int` | `PPT` marker 的**最后一个 token 下标**（包含）；找不到为 `-1` |
+| 列名               | 类型          | 说明                                                                    |
+| ------------------ | ------------- | ----------------------------------------------------------------------- |
+| `input_ids`      | `List[int]` | 原始 token ids，**不再静态 pad**                                  |
+| `attention_mask` | `List[int]` | 动态长度，与`input_ids` 对齐                                          |
+| `labels`         | `List[int]` | =`input_ids.copy()`；训练时 PPT 前会被改写为 `-100`                 |
+| `length`         | `int`       | `len(input_ids)`，`group_by_length=True` 时可加速 batching          |
+| `ppt_end`        | `int`       | `PPT` marker 的**最后一个 token 下标**（包含）；找不到为 `-1` |
 
 `ppt_end` 是通过 `tokenizer("PPT", add_special_tokens=False)` 及其带空格的几种变体作为
 候选子序列，在每条 `input_ids` 上做一次 KMP 风格搜索得到；训练时直接 `labels[:ppt_end+1] = -100`。
@@ -189,6 +190,7 @@ PY
 ### 4.2 命令：构建 `for_gen`（默认流程）
 
 > **tokenizer 选择**：
+>
 > - 做了 §3 扩词表：`--tokenizer_path /home/qsy/huggingface/model/Qwen3-0.6B-tvm-ext`，`--save_path` 建议改成 `4090_gen_qwen_v2_ext`
 > - 没做 §3：保留 `--tokenizer_path /home/qsy/huggingface/model/Qwen3-0.6B`
 >
@@ -212,18 +214,18 @@ cd /home/qsy/workspace/complier/llm_compiler/LLM
 
 完整参数说明：
 
-| CLI 参数 | 作用 | 建议值 |
-| --- | --- | --- |
-| `--for_type` | 产物类型（`for_gen` / `for_gen_best` / `for_latency` …） | `for_gen` |
-| `--target` | 硬件键，会写进 register_data_path | `nvidia/geforce-rtx-4090` |
-| `--dataset_path` | 原始 `to_measure_programs/*` 目录 | 同上表 |
-| `--tokenizer_path` | 用来 tokenize 的模型目录 | 基础模型路径 |
-| `--save_path` | 输出 HuggingFace 数据集目录 | `4090_gen_qwen_v2` |
-| `--max_length` | 序列截断上限 | `1024` |
-| `--valid_percentage` | 按文件切分的验证集比例 | `5` |
-| `--min_suffix_tokens` | `PPT` 之后至少保留多少 token 才保留样本 | `16` |
-| `--split_seed` | 按文件切分的随机种子 | `0`（可复现） |
-| `--ppt_marker` | 用来定位 decision suffix 的标记 | `PPT`（与训练数据生成保持一致） |
+| CLI 参数                | 作用                                                            | 建议值                            |
+| ----------------------- | --------------------------------------------------------------- | --------------------------------- |
+| `--for_type`          | 产物类型（`for_gen` / `for_gen_best` / `for_latency` …） | `for_gen`                       |
+| `--target`            | 硬件键，会写进 register_data_path                               | `nvidia/geforce-rtx-4090`       |
+| `--dataset_path`      | 原始`to_measure_programs/*` 目录                              | 同上表                            |
+| `--tokenizer_path`    | 用来 tokenize 的模型目录                                        | 基础模型路径                      |
+| `--save_path`         | 输出 HuggingFace 数据集目录                                     | `4090_gen_qwen_v2`              |
+| `--max_length`        | 序列截断上限                                                    | `1024`                          |
+| `--valid_percentage`  | 按文件切分的验证集比例                                          | `5`                             |
+| `--min_suffix_tokens` | `PPT` 之后至少保留多少 token 才保留样本                       | `16`                            |
+| `--split_seed`        | 按文件切分的随机种子                                            | `0`（可复现）                   |
+| `--ppt_marker`        | 用来定位 decision suffix 的标记                                 | `PPT`（与训练数据生成保持一致） |
 
 > `--for_type` 可选的其他值在 `make_dataset.py::for_clm_or_mlm` 里可以查到；
 > 本指南默认只走 `for_gen`，因为它是目前唯一配套的 CLM 训练流。
@@ -345,6 +347,7 @@ Stage1 目标：**学会在 PPT 之后补全结构合法的 TVM 调度后缀**�
 ### 6.1 推荐命令（4 × 4090 bf16）
 
 > **扩词表 / 不扩词表对应的三处路径**：
+>
 > - `MODEL_NAME_OR_PATH` / `TOKENIZER_NAME`：扩了→`Qwen3-0.6B-tvm-ext`；没扩→`Qwen3-0.6B`
 > - `DATASET_NAME`：扩了→`4090_gen_qwen_v2_ext`；没扩→`4090_gen_qwen_v2`
 > - `OUTPUT_DIR`：建议带上 `-ext` 后缀以便区分，例如 `-struct-stage1-v2-ext`
@@ -361,21 +364,22 @@ MODEL_NAME_OR_PATH=/home/qsy/huggingface/model/Qwen3-0.6B-tvm-ext \
 TOKENIZER_NAME=/home/qsy/huggingface/model/Qwen3-0.6B-tvm-ext \
 DATASET_NAME=/home/qsy/workspace/gen_data/4090_gen_qwen_v2_ext \
 OUTPUT_DIR=/home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-ext \
-PER_DEVICE_TRAIN_BATCH_SIZE=8 \
-PER_DEVICE_EVAL_BATCH_SIZE=8 \
-GRADIENT_ACCUMULATION_STEPS=1 \
+PER_DEVICE_TRAIN_BATCH_SIZE=2 \
+PER_DEVICE_EVAL_BATCH_SIZE=2 \
+GRADIENT_ACCUMULATION_STEPS=4 \
 LEARNING_RATE=1e-5 \
 NUM_TRAIN_EPOCHS=1 \
 MIN_SUFFIX_TOKENS=16 \
 LOGGING_STEPS=100 \
-EVAL_STEPS=2000 \
-SAVE_STEPS=2000 \
+EVAL_STEPS=5000 \
+SAVE_STEPS=5000 \
 SAVE_TOTAL_LIMIT=3 \
-DATALOADER_NUM_WORKERS=8 \
+DATALOADER_NUM_WORKERS=4 \
 DATALOADER_PERSISTENT_WORKERS=1 \
 GRADIENT_CHECKPOINTING=0 \
-GROUP_BY_LENGTH=0 \
-REMOVE_UNUSED_COLUMNS=1 \
+GROUP_BY_LENGTH=1 \
+REMOVE_UNUSED_COLUMNS=0 \
+MAX_EVAL_SAMPLES=8192 \
 METRIC_FOR_BEST_MODEL=eval_accuracy \
 GREATER_IS_BETTER=1 \
 LOAD_BEST_MODEL_AT_END=1 \
@@ -388,15 +392,23 @@ DELETE_LOG_IF_EXISTS=1 \
 观察日志：
 
 ```bash
-tail -f /home/qsy/workspace/complier/llm_compiler/LLM/run_train_stage1_v2_ext.log
+tail -f /home/qsy/workspace/complier/llm_compiler/LLM/train/run_train_stage1_v2_ext.log
 ```
 
 ### 6.2 显存不够怎么办（按这个顺序调）
 
-1. `PER_DEVICE_TRAIN_BATCH_SIZE=4` + `GRADIENT_ACCUMULATION_STEPS=2`（等效总 batch 不变）。
-2. 还不够：再加 `GRADIENT_CHECKPOINTING=1`（会牺牲约 25% 训练吞吐，但显存省一半以上）。
-3. 还不够：`PER_DEVICE_TRAIN_BATCH_SIZE=2 / GRADIENT_ACCUMULATION_STEPS=4 / GRADIENT_CHECKPOINTING=1`。
-4. 还不够：减 `NPROC_PER_NODE`，或把 `--max_length` 在数据集阶段降到 `768`。
+对于 Qwen3-0.6B 的 151k 词表，`per_device_train_batch_size=8` 在 seq 长度接近
+`max_length=1024` 时会在交叉熵的 FP32 logits 转换阶段额外申请约 4.6 GiB，4090
+容易 OOM。完整数据训练中，`batch=4 + gradient_accumulation=2` 仍会在第一个 loss
+计算时额外申请约 2.3 GiB 并 OOM。当前推荐默认值是
+`batch=2 + gradient_accumulation=4`，有效总 batch 仍为 32。
+
+1. 默认使用 `PER_DEVICE_TRAIN_BATCH_SIZE=2` + `GRADIENT_ACCUMULATION_STEPS=4`。
+2. 还不够：再加 `GRADIENT_CHECKPOINTING=1`（会牺牲训练吞吐，但可进一步降低激活显存）。
+3. 还不够：减 `NPROC_PER_NODE`，或把 `--max_length` 在数据集阶段降到 `768`。
+
+本机 PyTorch/CUDA 组合会报告 `expandable_segments not supported on this platform`，因此不要把
+`PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` 作为默认配置。
 
 ### 6.3 打开结构性评估（可选，强烈推荐）
 
@@ -431,15 +443,15 @@ StructuralEvalCallback metrics: {
 
 metrics 字典里会新增以下 key（最佳模型自动按 `metric_for_best_model` 选取）：
 
-| key | 含义 |
-| --- | --- |
-| `eval_struct_parse_valid_rate` | 生成 suffix 被 `SketchPolicy.gen_states` 成功解析的比例 |
-| `eval_struct_fallback_rate` | 全部解析失败、只能回退 sketch 的 workload 比例 |
-| `eval_struct_distinct_rate` | 生成 state 去重后比例（越高越好，避免坍缩） |
-| `eval_struct_avg_parse_per_sketch` | 平均每个 workload 成功 parse 的 state 数 |
-| `eval_struct_samples_per_sec` / `eval_struct_elapsed_sec` | 本轮评估耗时 |
-| `eval_struct_build_valid_rate` | 仅当 `STRUCT_EVAL_DO_BUILD=1`，用 `LocalBuilder` 真实编译成功比例 |
-| `eval_struct_num_built` | 同上，进入 builder 的样本数 |
+| key                                                           | 含义                                                                 |
+| ------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `eval_struct_parse_valid_rate`                              | 生成 suffix 被`SketchPolicy.gen_states` 成功解析的比例             |
+| `eval_struct_fallback_rate`                                 | 全部解析失败、只能回退 sketch 的 workload 比例                       |
+| `eval_struct_distinct_rate`                                 | 生成 state 去重后比例（越高越好，避免坍缩）                          |
+| `eval_struct_avg_parse_per_sketch`                          | 平均每个 workload 成功 parse 的 state 数                             |
+| `eval_struct_samples_per_sec` / `eval_struct_elapsed_sec` | 本轮评估耗时                                                         |
+| `eval_struct_build_valid_rate`                              | 仅当`STRUCT_EVAL_DO_BUILD=1`，用 `LocalBuilder` 真实编译成功比例 |
+| `eval_struct_num_built`                                     | 同上，进入 builder 的样本数                                          |
 
 > 注意：Callback **仅 rank 0 执行**；首次 `on_evaluate` 要装载 TVM task registry，
 > 会额外花 30–60s。建议把 `EVAL_STEPS` 调到 4000–5000，`STRUCT_EVAL_MAX_WORKLOADS` 控制在 16–32。
@@ -461,19 +473,22 @@ MODEL_NAME_OR_PATH=/home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-
 TOKENIZER_NAME=/home/qsy/huggingface/model/Qwen3-0.6B-tvm-ext \
 DATASET_NAME=/home/qsy/workspace/gen_data/4090_gen_qwen_v2_ext \
 OUTPUT_DIR=/home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage2-v2-ext \
-PER_DEVICE_TRAIN_BATCH_SIZE=8 \
-PER_DEVICE_EVAL_BATCH_SIZE=8 \
-GRADIENT_ACCUMULATION_STEPS=1 \
+PER_DEVICE_TRAIN_BATCH_SIZE=2 \
+PER_DEVICE_EVAL_BATCH_SIZE=2 \
+GRADIENT_ACCUMULATION_STEPS=4 \
 LEARNING_RATE=5e-6 \
 NUM_TRAIN_EPOCHS=1 \
 MIN_SUFFIX_TOKENS=16 \
 LOGGING_STEPS=100 \
-EVAL_STEPS=2000 \
-SAVE_STEPS=2000 \
+EVAL_STEPS=5000 \
+SAVE_STEPS=5000 \
 SAVE_TOTAL_LIMIT=3 \
-DATALOADER_NUM_WORKERS=8 \
+DATALOADER_NUM_WORKERS=4 \
 DATALOADER_PERSISTENT_WORKERS=1 \
 GRADIENT_CHECKPOINTING=0 \
+GROUP_BY_LENGTH=1 \
+REMOVE_UNUSED_COLUMNS=0 \
+MAX_EVAL_SAMPLES=8192 \
 LOG_FILE=run_train_stage2_v2_ext.log \
 SESSION_NAME=qwen3_stage2_v2_ext \
 DELETE_LOG_IF_EXISTS=1 \
@@ -511,20 +526,20 @@ cd /home/qsy/workspace/complier/llm_compiler/LLM
 
 CLI 参数表：
 
-| 参数 | 作用 | 备注 |
-| --- | --- | --- |
-| `--model_name_or_path` | 要评估的 checkpoint | 训练输出目录或其中某个 `checkpoint-*` |
-| `--tokenizer_name` | 可选，默认与 `model_name_or_path` 同 | checkpoint 自带 tokenizer 时可不填 |
-| `--sketch_path` | sketch 记录（与 `gen_state.py` 一致） | 通常是 `sketch.json` 或等价文件 |
-| `--target` | 目标硬件 | 如 `"cuda -model=4090"` |
-| `--max_workloads` | 采样多少个 workload | 64 常够用，越多越稳 |
-| `--max_states_per_workload` | 每个 workload 让模型补全几个 state | `2` |
-| `--max_new_tokens` | 单条生成上限（会被 token 长度 scale） | `512` |
-| `--batch_size` | 生成 batch size | `8` |
-| `--do_build` | 是否在 `LocalBuilder` 上构建 | 推荐 `True`，多花几分钟 |
-| `--do_sample` | 是否采样生成；否则贪心 | `False` 可复现 |
-| `--seed` | workload 采样种子 | `42` |
-| `--output_json` | 报告写入位置 | 最终 metrics 落盘点 |
+| 参数                          | 作用                                   | 备注                                   |
+| ----------------------------- | -------------------------------------- | -------------------------------------- |
+| `--model_name_or_path`      | 要评估的 checkpoint                    | 训练输出目录或其中某个`checkpoint-*` |
+| `--tokenizer_name`          | 可选，默认与`model_name_or_path` 同  | checkpoint 自带 tokenizer 时可不填     |
+| `--sketch_path`             | sketch 记录（与`gen_state.py` 一致） | 通常是`sketch.json` 或等价文件       |
+| `--target`                  | 目标硬件                               | 如`"cuda -model=4090"`               |
+| `--max_workloads`           | 采样多少个 workload                    | 64 常够用，越多越稳                    |
+| `--max_states_per_workload` | 每个 workload 让模型补全几个 state     | `2`                                  |
+| `--max_new_tokens`          | 单条生成上限（会被 token 长度 scale）  | `512`                                |
+| `--batch_size`              | 生成 batch size                        | `8`                                  |
+| `--do_build`                | 是否在`LocalBuilder` 上构建          | 推荐`True`，多花几分钟               |
+| `--do_sample`               | 是否采样生成；否则贪心                 | `False` 可复现                       |
+| `--seed`                    | workload 采样种子                      | `42`                                 |
+| `--output_json`             | 报告写入位置                           | 最终 metrics 落盘点                    |
 
 生成的 JSON 字段与前述 callback metrics 相同。
 
@@ -560,18 +575,18 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 /home/qsy/anaconda3/envs/tlm/bin/python gen_state.p
 
 主要参数意义：
 
-| 参数 | 作用 |
-| --- | --- |
-| `--sketch_path` | 输入 sketch（定义 workload 集合） |
-| `--save_path` | 生成 state 的落盘路径 |
-| `--keep_cnt` | 每个 workload 保留的 state 数 |
-| `--is_build` | 是否真的用 LocalBuilder 做构建 |
-| `--allow_repeat` | 是否允许输出重复 state |
-| `--do_sample` / `--sample_top_p` / `--sample_top_k` / `--sample_temperature` | 采样超参 |
-| `--generation_batch_size` | 生成 batch size（后缀越长建议越小） |
-| `--min_gen_tokens` / `--gen_token_scale` | 当 policy 给出的 `max_new_tokens` 太短时的兜底放大 |
-| `--trim_last_input_token` | 旧版 SentencePiece 常用，BPE/Qwen 默认 False |
-| `--fallback_to_sketch_when_invalid` | 全部无效时退回 sketch state |
+| 参数                                                                                 | 作用                                                |
+| ------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| `--sketch_path`                                                                    | 输入 sketch（定义 workload 集合）                   |
+| `--save_path`                                                                      | 生成 state 的落盘路径                               |
+| `--keep_cnt`                                                                       | 每个 workload 保留的 state 数                       |
+| `--is_build`                                                                       | 是否真的用 LocalBuilder 做构建                      |
+| `--allow_repeat`                                                                   | 是否允许输出重复 state                              |
+| `--do_sample` / `--sample_top_p` / `--sample_top_k` / `--sample_temperature` | 采样超参                                            |
+| `--generation_batch_size`                                                          | 生成 batch size（后缀越长建议越小）                 |
+| `--min_gen_tokens` / `--gen_token_scale`                                         | 当 policy 给出的`max_new_tokens` 太短时的兜底放大 |
+| `--trim_last_input_token`                                                          | 旧版 SentencePiece 常用，BPE/Qwen 默认 False        |
+| `--fallback_to_sketch_when_invalid`                                                | 全部无效时退回 sketch state                         |
 
 ---
 
@@ -595,97 +610,98 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 /home/qsy/anaconda3/envs/tlm/bin/python gen_state.p
 
 ### 核心
 
-| 环境变量 | 作用 | 默认 |
-| --- | --- | --- |
-| `TRAIN_STAGE` | `stage1` / `stage2` | `stage1` |
-| `SMOKE_TEST` | smoke 模式 | `0` |
-| `CUDA_VISIBLE_DEVICES` | 可见 GPU | `0,1,2,3` |
-| `NPROC_PER_NODE` | `torchrun` 进程数 | 可见 GPU 数 |
-| `MASTER_PORT` | DDP 端口 | `29531` |
-| `TORCHRUN_BIN` | torchrun 二进制路径 | `~/anaconda3/envs/tlm/bin/torchrun` |
+| 环境变量                 | 作用                    | 默认                                  |
+| ------------------------ | ----------------------- | ------------------------------------- |
+| `TRAIN_STAGE`          | `stage1` / `stage2` | `stage1`                            |
+| `SMOKE_TEST`           | smoke 模式              | `0`                                 |
+| `CUDA_VISIBLE_DEVICES` | 可见 GPU                | `0,1,2,3`                           |
+| `NPROC_PER_NODE`       | `torchrun` 进程数     | 可见 GPU 数                           |
+| `MASTER_PORT`          | DDP 端口                | `29531`                             |
+| `TORCHRUN_BIN`         | torchrun 二进制路径     | `~/anaconda3/envs/tlm/bin/torchrun` |
 
 ### 路径
 
-| 环境变量 | 作用 | 默认 |
-| --- | --- | --- |
-| `MODEL_NAME_OR_PATH` | 初始化模型（扩词表后改成 `Qwen3-0.6B-tvm-ext`） | 按 stage 自动推断 |
-| `TOKENIZER_NAME` | tokenizer（应与 `MODEL_NAME_OR_PATH` 的词表一致） | 同上 |
-| `DATASET_NAME` | tokenized 数据集（扩词表用 `*_ext` 版本） | `4090_gen_qwen` |
-| `OUTPUT_DIR` | 输出 checkpoint 目录 | 推荐显式传 |
-| `LOG_FILE` | 日志文件 | `run_train_qwen3_clm_py.log` |
-| `SESSION_NAME` | tmux session | 推荐显式传 |
-| `DELETE_LOG_IF_EXISTS` | 启动前删旧日志 | `0` |
+| 环境变量                 | 作用                                               | 默认                           |
+| ------------------------ | -------------------------------------------------- | ------------------------------ |
+| `MODEL_NAME_OR_PATH`   | 初始化模型（扩词表后改成`Qwen3-0.6B-tvm-ext`）   | 按 stage 自动推断              |
+| `TOKENIZER_NAME`       | tokenizer（应与`MODEL_NAME_OR_PATH` 的词表一致） | 同上                           |
+| `DATASET_NAME`         | tokenized 数据集（扩词表用`*_ext` 版本）         | `4090_gen_qwen`              |
+| `OUTPUT_DIR`           | 输出 checkpoint 目录                               | 推荐显式传                     |
+| `LOG_FILE`             | 日志文件                                           | `run_train_qwen3_clm_py.log` |
+| `SESSION_NAME`         | tmux session                                       | 推荐显式传                     |
+| `DELETE_LOG_IF_EXISTS` | 启动前删旧日志                                     | `0`                          |
 
 ### 批大小 / 吞吐
 
-| 环境变量 | 作用 | 默认（v2）| smoke 默认 |
-| --- | --- | --- | --- |
-| `PER_DEVICE_TRAIN_BATCH_SIZE` | 单卡训练 batch | `8` | `2` |
-| `PER_DEVICE_EVAL_BATCH_SIZE` | 单卡评估 batch | `8` | `2` |
-| `GRADIENT_ACCUMULATION_STEPS` | 梯度累积 | `1` | `1` |
-| `DATALOADER_NUM_WORKERS` | dataloader 线程数 | `8` | `0` |
-| `DATALOADER_PERSISTENT_WORKERS` | 持久 workers | `1` | `0` |
-| `GRADIENT_CHECKPOINTING` | 激活重算 | `0` | `0` |
-| `GROUP_BY_LENGTH` | 按长度分 batch（需要 `length` 列） | `0` | `0` |
-| `REMOVE_UNUSED_COLUMNS` | 让 Trainer 剔除无关列 | `1` | `1` |
+| 环境变量                          | 作用                                | 默认（v2） | smoke 默认 |
+| --------------------------------- | ----------------------------------- | ---------- | ---------- |
+| `PER_DEVICE_TRAIN_BATCH_SIZE`   | 单卡训练 batch                      | `2`      | `2`      |
+| `PER_DEVICE_EVAL_BATCH_SIZE`    | 单卡评估 batch                      | `2`      | `2`      |
+| `GRADIENT_ACCUMULATION_STEPS`   | 梯度累积                            | `4`      | `1`      |
+| `DATALOADER_NUM_WORKERS`        | dataloader 线程数                   | `4`      | `0`      |
+| `DATALOADER_PERSISTENT_WORKERS` | 持久 workers                        | `1`      | `0`      |
+| `GRADIENT_CHECKPOINTING`        | 激活重算                            | `0`      | `0`      |
+| `GROUP_BY_LENGTH`               | 按长度分 batch（需要`length` 列） | `1`      | `0`      |
+| `REMOVE_UNUSED_COLUMNS`         | 让 Trainer 剔除无关列               | `0`      | `0`      |
 
 ### 调度 / 日志
 
-| 环境变量 | 作用 | 默认 | smoke 默认 |
-| --- | --- | --- | --- |
-| `LEARNING_RATE` | 初始 LR | Stage1 `1e-5` / Stage2 `5e-6` | 同 |
-| `NUM_TRAIN_EPOCHS` | 训练 epoch 数 | `1` | `1` |
-| `MAX_STEPS` | 硬截断步数 | 空 | `20` |
-| `MAX_TRAIN_SAMPLES` | 限制训练样本 | 空 | `2048` |
-| `MAX_EVAL_SAMPLES` | 限制验证样本 | 空 | `256` |
-| `MIN_SUFFIX_TOKENS` | 最小后缀 token 数 | `16` | `16` |
-| `SAMPLE_SEED` | 抽样种子 | `42` | `42` |
-| `LOGGING_STEPS` | log 频率 | `100` | `5` |
-| `EVAL_STEPS` | eval 频率 | `2000` | `10` |
-| `SAVE_STEPS` | 保存频率 | `2000` | `20` |
-| `SAVE_TOTAL_LIMIT` | checkpoint 保留数 | `3` | `1` |
-| `WARMUP_RATIO` / `WARMUP_STEPS` | warmup | `0.03` / — | — |
-| `LOAD_BEST_MODEL_AT_END` | 训练结束加载最佳 | `1` | `0` |
-| `METRIC_FOR_BEST_MODEL` | 最佳模型指标 | `eval_accuracy` | 同 |
-| `GREATER_IS_BETTER` | 指标越大越好 | `1` | `1` |
-| `OVERWRITE_OUTPUT_DIR` | 覆盖输出目录 | `0` | `1` |
+| 环境变量                            | 作用              | 默认                             | smoke 默认 |
+| ----------------------------------- | ----------------- | -------------------------------- | ---------- |
+| `LEARNING_RATE`                   | 初始 LR           | Stage1`1e-5` / Stage2 `5e-6` | 同         |
+| `NUM_TRAIN_EPOCHS`                | 训练 epoch 数     | `1`                            | `1`      |
+| `MAX_STEPS`                       | 硬截断步数        | 空                               | `20`     |
+| `MAX_TRAIN_SAMPLES`               | 限制训练样本      | 空                               | `2048`   |
+| `MAX_EVAL_SAMPLES`                | 中间验证固定抽样数 | `8192`                          | `256`    |
+| `MIN_SUFFIX_TOKENS`               | 最小后缀 token 数 | `16`                           | `16`     |
+| `SAMPLE_SEED`                     | 抽样种子          | `42`                           | `42`     |
+| `LOGGING_STEPS`                   | log 频率          | `100`                          | `5`      |
+| `EVAL_STEPS`                      | eval 频率         | `5000`                         | `10`     |
+| `SAVE_STEPS`                      | 保存频率          | `5000`                         | `20`     |
+| `SAVE_TOTAL_LIMIT`                | checkpoint 保留数 | `3`                            | `1`      |
+| `WARMUP_RATIO` / `WARMUP_STEPS` | warmup            | `0.03` / —                    | —         |
+| `LOAD_BEST_MODEL_AT_END`          | 训练结束加载最佳  | `1`                            | `0`      |
+| `METRIC_FOR_BEST_MODEL`           | 最佳模型指标      | `eval_accuracy`                | 同         |
+| `GREATER_IS_BETTER`               | 指标越大越好      | `1`                            | `1`      |
+| `OVERWRITE_OUTPUT_DIR`            | 覆盖输出目录      | `0`                            | `1`      |
 
 ### 结构性评估（可选）
 
-| 环境变量 | 作用 | 默认 |
-| --- | --- | --- |
-| `STRUCT_EVAL_SKETCH_PATH` | 开启 callback 的开关（设了即启用） | 空 |
-| `STRUCT_EVAL_TARGET` | TVM target 字符串 | 空 |
-| `STRUCT_EVAL_MAX_WORKLOADS` | 每轮 eval 采样多少 workload | `32` |
-| `STRUCT_EVAL_MAX_STATES` | 每个 workload 生成几个 state | `2` |
-| `STRUCT_EVAL_MAX_NEW_TOKENS` | 单条生成上限 | `512` |
-| `STRUCT_EVAL_BATCH_SIZE` | 生成 batch size | `8` |
-| `STRUCT_EVAL_DO_BUILD` | 是否跑 LocalBuilder | `0` |
-| `STRUCT_EVAL_DO_SAMPLE` | 是否采样（否则贪心） | `0` |
-| `STRUCT_EVAL_SEED` | workload 采样种子 | `42` |
+| 环境变量                       | 作用                               | 默认    |
+| ------------------------------ | ---------------------------------- | ------- |
+| `STRUCT_EVAL_SKETCH_PATH`    | 开启 callback 的开关（设了即启用） | 空      |
+| `STRUCT_EVAL_TARGET`         | TVM target 字符串                  | 空      |
+| `STRUCT_EVAL_MAX_WORKLOADS`  | 每轮 eval 采样多少 workload        | `32`  |
+| `STRUCT_EVAL_MAX_STATES`     | 每个 workload 生成几个 state       | `2`   |
+| `STRUCT_EVAL_MAX_NEW_TOKENS` | 单条生成上限                       | `512` |
+| `STRUCT_EVAL_BATCH_SIZE`     | 生成 batch size                    | `8`   |
+| `STRUCT_EVAL_DO_BUILD`       | 是否跑 LocalBuilder                | `0`   |
+| `STRUCT_EVAL_DO_SAMPLE`      | 是否采样（否则贪心）               | `0`   |
+| `STRUCT_EVAL_SEED`           | workload 采样种子                  | `42`  |
 
 ---
 
 ## 12. 常用 `train_qwen3_clm.py` CLI 参数（直调时用）
 
-| 参数 | 作用 | 推荐值 |
-| --- | --- | --- |
-| `--dataset_name` | tokenized 数据集目录 | `4090_gen_qwen_v2` |
-| `--mask_prefix_before_ppt` | 只对 PPT 后缀算 loss | `True` |
-| `--drop_samples_without_ppt` | 丢弃找不到 PPT 的样本 | `True` |
-| `--min_suffix_tokens` | 最小后缀监督长度 | `16` |
-| `--subsample_before_mask` | `先抽样再 mask`，smoke 必开 | `True` |
-| `--max_train_samples` / `--max_eval_samples` | 限样本数 | smoke 用 |
-| `--per_device_train_batch_size` | 单卡训练 batch | 正式训练 `8` |
-| `--gradient_accumulation_steps` | 梯度累积 | `1` |
-| `--learning_rate` | LR | `1e-5 → 5e-6` |
-| `--bf16` | bfloat16 | `True` |
-| `--gradient_checkpointing` | 激活重算 | `False`（显存紧张时 `True`） |
-| `--dataloader_num_workers` / `--dataloader_persistent_workers` | 提升吞吐 | `8 / True` |
-| `--group_by_length` | 按长度分 batch（需 `length` 列） | 可选 `True` |
-| `--eval_steps` / `--save_steps` | eval / save 间隔 | 正式训练 `2000` |
-| `--load_best_model_at_end` | 训练结束加载最佳 | `True` |
-| `--metric_for_best_model` | 最佳指标 | `eval_accuracy` 或 `eval_struct_parse_valid_rate` |
+| 参数                                                               | 作用                              | 推荐值                                                |
+| ------------------------------------------------------------------ | --------------------------------- | ----------------------------------------------------- |
+| `--dataset_name`                                                 | tokenized 数据集目录              | `4090_gen_qwen_v2`                                  |
+| `--mask_prefix_before_ppt`                                       | 只对 PPT 后缀算 loss              | `True`                                              |
+| `--mask_in_collator`                                             | 用预计算`ppt_end`按 batch 掩码  | `True`                                              |
+| `--drop_samples_without_ppt`                                     | 丢弃找不到 PPT 的样本             | `True`                                              |
+| `--min_suffix_tokens`                                            | 最小后缀监督长度                  | `16`                                                |
+| `--subsample_before_mask`                                        | `先抽样再 mask`，smoke 必开     | `True`                                              |
+| `--max_train_samples` / `--max_eval_samples`                   | 限样本数                          | smoke 用                                              |
+| `--per_device_train_batch_size`                                  | 单卡训练 batch                    | 正式训练`2`                                         |
+| `--gradient_accumulation_steps`                                  | 梯度累积                          | 正式训练`4`                                         |
+| `--learning_rate`                                                | LR                                | `1e-5 → 5e-6`                                      |
+| `--bf16`                                                         | bfloat16                          | `True`                                              |
+| `--gradient_checkpointing`                                       | 激活重算                          | `False`（显存紧张时 `True`）                      |
+| `--dataloader_num_workers` / `--dataloader_persistent_workers` | 提升吞吐                          | `4 / True`                                          |
+| `--group_by_length`                                              | 按长度分 batch（需`length` 列） | `True`                                              |
+| `--eval_steps` / `--save_steps`                                | eval / save 间隔                  | 正式训练`5000`                                      |
+| `--load_best_model_at_end`                                       | 训练结束加载最佳                  | `True`                                              |
+| `--metric_for_best_model`                                        | 最佳指标                          | `eval_accuracy` 或 `eval_struct_parse_valid_rate` |
 
 ---
 
@@ -700,7 +716,8 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 /home/qsy/anaconda3/envs/tlm/bin/python gen_state.p
 - `train_results.json` / `eval_results.json`：训练 / 验证汇总指标
 - `all_results.json`：二者合并
 
-数据目录下还会多出 `train/cache-*.arrow`、`validation/cache-*.arrow`，是 `datasets.map()` 的缓存，属正常现象。
+新版带 `ppt_end` 的数据集直接在 collator 中掩码，不会再为完整训练集生成 masked
+`cache-*.arrow`。只有旧数据集走兼容 `datasets.map()/filter()` 路径时才会生成缓存。
 
 ---
 
@@ -721,9 +738,9 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 /home/qsy/anaconda3/envs/tlm/bin/python gen_state.p
 
 ### 14.3 `group_by_length=True` 要不要开？
 
-- 开之后 batch 内长度差异缩小，吞吐一般再涨 `5–10%`。
-- 但会牺牲一些随机性，早期 loss 曲线会更"锯齿"。
-- Stage1 建议**先关**，Stage2 稳态期可以试 `GROUP_BY_LENGTH=1`。
+- 当前 216 万条数据的实测 padding 浪费从随机 batch 的 `10.79%` 降到 `0.53%`。
+- HuggingFace 的 LengthGroupedSampler 仍会打乱 mega-batch，不是全局按长度排序。
+- Stage1/Stage2 默认都建议 `GROUP_BY_LENGTH=1`。
 
 ### 14.4 `StructuralEvalCallback` 导致训练变慢太多？
 
@@ -766,11 +783,11 @@ Callback 默认只在 rank 0 计算，其它 rank metrics 里没这个 key。如
 本章介绍 `plan/02_thesis_innovations.md` 中的创新点 2。整条流水线**完全与 §6/§7 的 Stage1/Stage2 解耦**：
 不修改已有数据集，不改动 CLM 训练脚本，只新增三个脚本——
 
-| 新增文件 | 作用 |
-| --- | --- |
-| `build_preference_pairs.py` | 把 TVM 测量记录拼成 `(prompt, chosen, rejected, latency_gap, latency_weight)` 的 JSONL |
-| `train_qwen3_dpo.py` | 纯 HF Trainer 自实现 DPO / LAPO 损失；通过 `--training_mode` 切换 `sft / dpo / lapo` |
-| `run_train_qwen3_dpo.py` | torchrun 包装；用 `USE_DPO` / `TRAINING_MODE` / `LAPO` 环境变量一键切换 |
+| 新增文件                      | 作用                                                                                    |
+| ----------------------------- | --------------------------------------------------------------------------------------- |
+| `build_preference_pairs.py` | 把 TVM 测量记录拼成`(prompt, chosen, rejected, latency_gap, latency_weight)` 的 JSONL |
+| `train_qwen3_dpo.py`        | 纯 HF Trainer 自实现 DPO / LAPO 损失；通过`--training_mode` 切换 `sft / dpo / lapo` |
+| `run_train_qwen3_dpo.py`    | torchrun 包装；用`USE_DPO` / `TRAINING_MODE` / `LAPO` 环境变量一键切换            |
 
 训练阶段拓扑：
 
@@ -823,7 +840,6 @@ CUDA_VISIBLE_DEVICES=0 /home/qsy/anaconda3/envs/tlm/bin/python measure_programs.
   CUDA_VISIBLE_DEVICES=1 python3 measure_programs.py --target "cuda -model=4090" \
       --input-dir /data3/qsy/dataset/measure_records/4090 --start-file-idx 100
   ```
-
 - `--cuda-visible X`：等价于启动前 `export CUDA_VISIBLE_DEVICES=X`，脚本内部会在 `import tvm` 之前生效。
 
 运行结束后控制台会打印 SUMMARY：
@@ -841,8 +857,7 @@ CUDA_VISIBLE_DEVICES=0 /home/qsy/anaconda3/envs/tlm/bin/python measure_programs.
 对旧用法的兼容：仍然支持 `--to-measure-path X --measured-path Y` 单文件模式；加 `--resume` 可在
 已有输出文件上续测，不加则保持旧行为（启动时清空 `--measured-path`）。
 
-> v2 修复：移除旧脚本硬编码的 `CUDA_VISIBLE_DEVICES="3"`；删除名存实亡的 `--start-idx / --end-idx /
-> --step-idx` 参数；修复 resume 能力缺失。
+> v2 修复：移除旧脚本硬编码的 `CUDA_VISIBLE_DEVICES="3"`；删除名存实亡的 `--start-idx / --end-idx / --step-idx` 参数；修复 resume 能力缺失。
 
 ### 15.1 第一步：构造偏好对数据集
 
@@ -880,23 +895,23 @@ cd /home/qsy/workspace/complier/llm_compiler/LLM
 
 每条记录字段：
 
-| 字段 | 含义 |
-| --- | --- |
-| `prompt` | compute DAG + 直到 PPT 为止的 steps 序列化（与 §4 的 text 编码规则完全一致） |
-| `chosen` | 同组内 latency 最低的 suffix 序列 |
-| `rejected` | 同组内 latency ≥ `min_latency_gap_ratio × chosen` 的较慢 suffix |
-| `latency_chosen` / `latency_rejected` | 原始 ms 值 |
-| `latency_gap` | `latency_rejected / latency_chosen` |
-| `latency_weight` | 由 `--weight_strategy` 计算的 LAPO 权重，≥ 1 |
+| 字段                                      | 含义                                                                          |
+| ----------------------------------------- | ----------------------------------------------------------------------------- |
+| `prompt`                                | compute DAG + 直到 PPT 为止的 steps 序列化（与 §4 的 text 编码规则完全一致） |
+| `chosen`                                | 同组内 latency 最低的 suffix 序列                                             |
+| `rejected`                              | 同组内 latency ≥`min_latency_gap_ratio × chosen` 的较慢 suffix            |
+| `latency_chosen` / `latency_rejected` | 原始 ms 值                                                                    |
+| `latency_gap`                           | `latency_rejected / latency_chosen`                                         |
+| `latency_weight`                        | 由`--weight_strategy` 计算的 LAPO 权重，≥ 1                                |
 
 `weight_strategy` 可选：
 
-| 值 | 公式 | 适用 |
-| --- | --- | --- |
-| `uniform` | 恒为 1 | 等价于 vanilla DPO |
-| `log_gap` | `max(1, log(gap) + 1)` | 推荐首选，抑制极端值 |
-| `linear_gap` | `max(1, gap)` | 强调大差距样本 |
-| `clipped_linear` | `min(weight_clip, max(1, gap))` | 需要手工截断时使用 |
+| 值                 | 公式                              | 适用                 |
+| ------------------ | --------------------------------- | -------------------- |
+| `uniform`        | 恒为 1                            | 等价于 vanilla DPO   |
+| `log_gap`        | `max(1, log(gap) + 1)`          | 推荐首选，抑制极端值 |
+| `linear_gap`     | `max(1, gap)`                   | 强调大差距样本       |
+| `clipped_linear` | `min(weight_clip, max(1, gap))` | 需要手工截断时使用   |
 
 ### 15.2 第二步：训练——一键切换 SFT / DPO / LAPO
 
@@ -962,43 +977,43 @@ SESSION_NAME=qwen3_lapo_v2_ext \
 
 #### 模式切换（核心）
 
-| 变量 | 作用 | 默认 |
-| --- | --- | --- |
-| `TRAINING_MODE` | 显式指定 `sft` / `dpo` / `lapo`；优先级最高 | 空 |
-| `LAPO` | 便捷开关；为 true 时覆盖 `USE_DPO` | `false` |
-| `USE_DPO` | DPO 总开关；为 false 则退化为 SFT | `true` |
-| `BETA` | DPO 温度系数 β | `0.1` |
-| `LOSS_TYPE` | `sigmoid` 或 `hinge` | `sigmoid` |
-| `LABEL_SMOOTHING` | IPO 风格的 label smoothing | `0.0` |
-| `LAPO_WEIGHT_CLIP` | LAPO 权重上限 | `10.0` |
-| `LAPO_NORMALIZE` | batch 内权重归一化 | `1` |
+| 变量                 | 作用                                             | 默认        |
+| -------------------- | ------------------------------------------------ | ----------- |
+| `TRAINING_MODE`    | 显式指定`sft` / `dpo` / `lapo`；优先级最高 | 空          |
+| `LAPO`             | 便捷开关；为 true 时覆盖`USE_DPO`              | `false`   |
+| `USE_DPO`          | DPO 总开关；为 false 则退化为 SFT                | `true`    |
+| `BETA`             | DPO 温度系数 β                                  | `0.1`     |
+| `LOSS_TYPE`        | `sigmoid` 或 `hinge`                         | `sigmoid` |
+| `LABEL_SMOOTHING`  | IPO 风格的 label smoothing                       | `0.0`     |
+| `LAPO_WEIGHT_CLIP` | LAPO 权重上限                                    | `10.0`    |
+| `LAPO_NORMALIZE`   | batch 内权重归一化                               | `1`       |
 
 #### 路径 & 数据
 
-| 变量 | 作用 | 默认 |
-| --- | --- | --- |
-| `PREFERENCE_DATASET` | §15.1 产出目录（含 `train_pairs.jsonl`） | `~/workspace/gen_data/4090_prefs` |
-| `POLICY_MODEL_PATH` / `MODEL_NAME_OR_PATH` | policy 起点（通常 Stage1 / Stage2 产物） | 自动 fallback 到 `struct-stage2 → struct-stage1 → tvm-ext → base` |
-| `REF_MODEL_PATH` | 参考模型；不设则复用 policy | 同 policy |
-| `TOKENIZER_NAME` | tokenizer；建议与 policy 一致 | policy |
-| `OUTPUT_DIR` | 输出目录；不设则按 `training_mode` 自动命名 | `Qwen3-0.6B-4090-<mode>` |
-| `MAX_PROMPT_LENGTH` / `MAX_LENGTH` | 截断长度 | `512 / 1024` |
+| 变量                                           | 作用                                         | 默认                                                                  |
+| ---------------------------------------------- | -------------------------------------------- | --------------------------------------------------------------------- |
+| `PREFERENCE_DATASET`                         | §15.1 产出目录（含`train_pairs.jsonl`）   | `~/workspace/gen_data/4090_prefs`                                   |
+| `POLICY_MODEL_PATH` / `MODEL_NAME_OR_PATH` | policy 起点（通常 Stage1 / Stage2 产物）     | 自动 fallback 到`struct-stage2 → struct-stage1 → tvm-ext → base` |
+| `REF_MODEL_PATH`                             | 参考模型；不设则复用 policy                  | 同 policy                                                             |
+| `TOKENIZER_NAME`                             | tokenizer；建议与 policy 一致                | policy                                                                |
+| `OUTPUT_DIR`                                 | 输出目录；不设则按`training_mode` 自动命名 | `Qwen3-0.6B-4090-<mode>`                                            |
+| `MAX_PROMPT_LENGTH` / `MAX_LENGTH`         | 截断长度                                     | `512 / 1024`                                                        |
 
 #### 分布式 / 训练超参
 
-| 变量 | 默认 |
-| --- | --- |
-| `CUDA_VISIBLE_DEVICES` | `0,1,2,3` |
-| `NPROC_PER_NODE` | 可见 GPU 数 |
-| `MASTER_PORT` | `29541`（与 CLM 的 `29531` 错开） |
-| `PER_DEVICE_TRAIN_BATCH_SIZE` | `4`（smoke `1`） |
-| `GRADIENT_ACCUMULATION_STEPS` | `2` |
-| `LEARNING_RATE` | `5e-7`（DPO 通常比 CLM 小一个量级） |
-| `NUM_TRAIN_EPOCHS` | `1` |
-| `LOGGING_STEPS / EVAL_STEPS / SAVE_STEPS` | `50 / 500 / 1000` |
-| `METRIC_FOR_BEST_MODEL` | `eval_loss` |
-| `GREATER_IS_BETTER` | `0`（loss 越小越好） |
-| `SMOKE_TEST` | `0`；为 `1` 时自动缩小 batch / step |
+| 变量                                        | 默认                                    |
+| ------------------------------------------- | --------------------------------------- |
+| `CUDA_VISIBLE_DEVICES`                    | `0,1,2,3`                             |
+| `NPROC_PER_NODE`                          | 可见 GPU 数                             |
+| `MASTER_PORT`                             | `29541`（与 CLM 的 `29531` 错开）   |
+| `PER_DEVICE_TRAIN_BATCH_SIZE`             | `4`（smoke `1`）                    |
+| `GRADIENT_ACCUMULATION_STEPS`             | `2`                                   |
+| `LEARNING_RATE`                           | `5e-7`（DPO 通常比 CLM 小一个量级）   |
+| `NUM_TRAIN_EPOCHS`                        | `1`                                   |
+| `LOGGING_STEPS / EVAL_STEPS / SAVE_STEPS` | `50 / 500 / 1000`                     |
+| `METRIC_FOR_BEST_MODEL`                   | `eval_loss`                           |
+| `GREATER_IS_BETTER`                       | `0`（loss 越小越好）                  |
+| `SMOKE_TEST`                              | `0`；为 `1` 时自动缩小 batch / step |
 
 其它 `WARMUP_*`、`MAX_STEPS`、`MAX_TRAIN_SAMPLES`、`GRADIENT_CHECKPOINTING`、
 `DATALOADER_NUM_WORKERS` 等语义与 §11 的 CLM 版本完全一致，不再赘述。
@@ -1013,11 +1028,11 @@ SESSION_NAME=qwen3_lapo_v2_ext \
  'reward/margin_mean': 0.1055,  'reward/accuracy': 0.78, ... }
 ```
 
-| 指标 | 含义 |
-| --- | --- |
-| `reward/accuracy` | 一个 batch 内 "chosen 的隐式 reward > rejected 的隐式 reward" 的比例；健康训练应从 `0.5` 上升到 `0.8+` |
-| `reward/margin_mean` | 平均 margin，逐步变大说明模型在学会"分辨好坏" |
-| `loss/sft` | 仅 `TRAINING_MODE=sft` 时出现，是普通 CLM 交叉熵 |
+| 指标                   | 含义                                                                                                      |
+| ---------------------- | --------------------------------------------------------------------------------------------------------- |
+| `reward/accuracy`    | 一个 batch 内 "chosen 的隐式 reward > rejected 的隐式 reward" 的比例；健康训练应从`0.5` 上升到 `0.8+` |
+| `reward/margin_mean` | 平均 margin，逐步变大说明模型在学会"分辨好坏"                                                             |
+| `loss/sft`           | 仅`TRAINING_MODE=sft` 时出现，是普通 CLM 交叉熵                                                         |
 
 ### 15.5 训练后的下游评估
 

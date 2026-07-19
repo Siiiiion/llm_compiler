@@ -106,6 +106,15 @@ class DataTrainingArguments:
         default=True,
         metadata={"help": "Mask labels before (and including) PPT marker so loss focuses on decision suffix."},
     )
+    mask_in_collator: bool = field(
+        default=True,
+        metadata={
+            "help": (
+                "For datasets with precomputed ppt_end, apply the suffix mask per batch "
+                "instead of materializing a full masked Arrow cache."
+            )
+        },
+    )
     ppt_marker: str = field(
         default="PPT",
         metadata={"help": "Marker token that separates prompt prefix and decision suffix."},
@@ -141,6 +150,53 @@ def _find_subseq_end(input_ids: List[int], patterns: List[List[int]]) -> Optiona
             if end <= len(input_ids) and input_ids[i:end] == pat:
                 return end - 1
     return None
+
+
+class PPTSuffixDataCollator:
+    """Apply the precomputed PPT suffix mask without rewriting the full dataset."""
+
+    def __init__(self, base_collator, drop_without_ppt: bool, min_suffix_tokens: int):
+        self.base_collator = base_collator
+        self.drop_without_ppt = drop_without_ppt
+        self.min_suffix_tokens = min_suffix_tokens
+
+    def __call__(self, features):
+        masked_features = []
+        for raw_feature in features:
+            feature = dict(raw_feature)
+            marker_end = int(feature.pop("ppt_end", -1))
+            feature.pop("length", None)
+            feature.pop("keep_sample", None)
+            feature.pop("suffix_tokens", None)
+
+            labels = feature.get("labels")
+            if hasattr(labels, "tolist"):
+                labels = labels.tolist()
+            else:
+                labels = list(labels)
+
+            if marker_end < 0 or marker_end >= len(labels):
+                if self.drop_without_ppt:
+                    raise ValueError(
+                        "Encountered a sample without a valid precomputed ppt_end. "
+                        "Rebuild the dataset or disable --mask_in_collator to use the legacy filter path."
+                    )
+                labels = [-100] * len(labels)
+            else:
+                cutoff = marker_end + 1
+                labels[:cutoff] = [-100] * cutoff
+                supervised_suffix = sum(label != -100 for label in labels[cutoff:])
+                if supervised_suffix < self.min_suffix_tokens:
+                    raise ValueError(
+                        "Encountered a precomputed PPT sample with only "
+                        f"{supervised_suffix} supervised suffix tokens; expected at least "
+                        f"{self.min_suffix_tokens}. Rebuild the dataset with matching settings."
+                    )
+
+            feature["labels"] = labels
+            masked_features.append(feature)
+
+        return self.base_collator(masked_features)
 
 
 def _load_tokenizer(model_args, data_args, tokenizer_path):
@@ -309,6 +365,32 @@ def main():
 
     tokenized_datasets = load_from_disk(data_args.dataset_name, keep_in_memory=False)
 
+    active_splits = []
+    if training_args.do_train:
+        active_splits.append("train")
+    if training_args.do_eval:
+        active_splits.append("validation")
+    use_precomputed_ppt_collator = (
+        data_args.mask_prefix_before_ppt
+        and data_args.mask_in_collator
+        and bool(active_splits)
+        and all(
+            split in tokenized_datasets
+            and "ppt_end" in tokenized_datasets[split].column_names
+            for split in active_splits
+        )
+    )
+    if use_precomputed_ppt_collator:
+        if training_args.remove_unused_columns:
+            logger.info(
+                "Disabling remove_unused_columns so the PPT collator receives precomputed ppt_end"
+            )
+            training_args.remove_unused_columns = False
+        logger.info(
+            "Using batch-time PPT suffix masking for splits=%s; no full Arrow mask cache will be written",
+            active_splits,
+        )
+
     tokenizer_path = model_args.tokenizer_name or model_args.model_name_or_path
     tokenizer = _load_tokenizer(model_args, data_args, tokenizer_path)
 
@@ -360,6 +442,8 @@ def main():
         model.resize_token_embeddings(len(tokenizer))
 
     def _strip_unused_length_column(ds):
+        if use_precomputed_ppt_collator:
+            return ds
         # If group_by_length is on, Trainer reads training_args.length_column_name.
         if training_args.group_by_length:
             return ds
@@ -382,14 +466,15 @@ def main():
                 max_samples=data_args.max_train_samples,
                 seed=data_args.sample_seed,
             )
-        if data_args.mask_prefix_before_ppt:
-            train_dataset = _apply_ppt_suffix_mask(
-                train_dataset,
-                split_name="train",
-                marker_patterns=marker_patterns,
-                drop_without_ppt=data_args.drop_samples_without_ppt,
-                min_suffix_tokens=data_args.min_suffix_tokens,
-            )
+        if data_args.mask_prefix_before_ppt and not use_precomputed_ppt_collator:
+            with training_args.main_process_first(desc="applying train PPT suffix mask"):
+                train_dataset = _apply_ppt_suffix_mask(
+                    train_dataset,
+                    split_name="train",
+                    marker_patterns=marker_patterns,
+                    drop_without_ppt=data_args.drop_samples_without_ppt,
+                    min_suffix_tokens=data_args.min_suffix_tokens,
+                )
         if data_args.max_train_samples is not None:
             train_dataset = train_dataset.select(range(min(len(train_dataset), data_args.max_train_samples)))
         train_dataset = _strip_unused_length_column(train_dataset)
@@ -412,14 +497,15 @@ def main():
                 max_samples=data_args.max_eval_samples,
                 seed=data_args.sample_seed + 1,
             )
-        if data_args.mask_prefix_before_ppt:
-            eval_dataset = _apply_ppt_suffix_mask(
-                eval_dataset,
-                split_name="validation",
-                marker_patterns=marker_patterns,
-                drop_without_ppt=data_args.drop_samples_without_ppt,
-                min_suffix_tokens=data_args.min_suffix_tokens,
-            )
+        if data_args.mask_prefix_before_ppt and not use_precomputed_ppt_collator:
+            with training_args.main_process_first(desc="applying validation PPT suffix mask"):
+                eval_dataset = _apply_ppt_suffix_mask(
+                    eval_dataset,
+                    split_name="validation",
+                    marker_patterns=marker_patterns,
+                    drop_without_ppt=data_args.drop_samples_without_ppt,
+                    min_suffix_tokens=data_args.min_suffix_tokens,
+                )
         if data_args.max_eval_samples is not None:
             eval_dataset = eval_dataset.select(range(min(len(eval_dataset), data_args.max_eval_samples)))
         eval_dataset = _strip_unused_length_column(eval_dataset)
@@ -449,13 +535,20 @@ def main():
     # Dynamic padding saves a lot of FLOPs when sequences are shorter than max_length.
     # Samples from the new dataset are stored unpadded; legacy datasets are already
     # pre-padded so collator.pad() is effectively a no-op for them.
-    data_collator = DataCollatorForSeq2Seq(
+    base_data_collator = DataCollatorForSeq2Seq(
         tokenizer,
-        model=model,
         label_pad_token_id=-100,
         pad_to_multiple_of=8,
         return_tensors="pt",
     )
+    if use_precomputed_ppt_collator:
+        data_collator = PPTSuffixDataCollator(
+            base_data_collator,
+            drop_without_ppt=data_args.drop_samples_without_ppt,
+            min_suffix_tokens=data_args.min_suffix_tokens,
+        )
+    else:
+        data_collator = base_data_collator
 
     callbacks = []
     if model_args.early_stopping_patience:

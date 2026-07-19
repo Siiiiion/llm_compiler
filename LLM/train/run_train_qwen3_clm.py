@@ -47,6 +47,7 @@ def _append_optional_arg(parts, name, value):
 
 
 cuda_visible_devices = os.environ.get("CUDA_VISIBLE_DEVICES", "0,1,2,3")
+pytorch_cuda_alloc_conf = os.environ.get("PYTORCH_CUDA_ALLOC_CONF")
 visible_devices = _parse_cuda_visible_devices(cuda_visible_devices)
 if not visible_devices:
     raise ValueError("CUDA_VISIBLE_DEVICES is empty. Please set at least one GPU id.")
@@ -145,20 +146,22 @@ if _looks_like_local_path(tokenizer_name) and not _is_valid_local_tokenizer_dir(
 if os.path.exists(log_file) and _env_flag("DELETE_LOG_IF_EXISTS", False):
     os.remove(log_file)
 
-per_device_train_batch_size = os.environ.get("PER_DEVICE_TRAIN_BATCH_SIZE", "2" if smoke_test else "8")
-per_device_eval_batch_size = os.environ.get("PER_DEVICE_EVAL_BATCH_SIZE", "2" if smoke_test else "8")
-gradient_accumulation_steps = os.environ.get("GRADIENT_ACCUMULATION_STEPS", "1")
+per_device_train_batch_size = os.environ.get("PER_DEVICE_TRAIN_BATCH_SIZE", "2")
+per_device_eval_batch_size = os.environ.get("PER_DEVICE_EVAL_BATCH_SIZE", "2")
+gradient_accumulation_steps = os.environ.get(
+    "GRADIENT_ACCUMULATION_STEPS", "1" if smoke_test else "4"
+)
 logging_steps = os.environ.get("LOGGING_STEPS", "5" if smoke_test else "100")
-eval_steps = os.environ.get("EVAL_STEPS", "10" if smoke_test else "2000")
-save_steps = os.environ.get("SAVE_STEPS", "20" if smoke_test else "2000")
+eval_steps = os.environ.get("EVAL_STEPS", "10" if smoke_test else "5000")
+save_steps = os.environ.get("SAVE_STEPS", "20" if smoke_test else "5000")
 save_total_limit = os.environ.get("SAVE_TOTAL_LIMIT", "1" if smoke_test else "3")
-dataloader_num_workers = os.environ.get("DATALOADER_NUM_WORKERS", "0" if smoke_test else "8")
+dataloader_num_workers = os.environ.get("DATALOADER_NUM_WORKERS", "0" if smoke_test else "4")
 dataloader_persistent_workers = _env_flag("DATALOADER_PERSISTENT_WORKERS", not smoke_test)
 warmup_ratio = os.environ.get("WARMUP_RATIO", "0.03")
 warmup_steps = os.environ.get("WARMUP_STEPS")
 max_steps = os.environ.get("MAX_STEPS", "20" if smoke_test else None)
 max_train_samples = os.environ.get("MAX_TRAIN_SAMPLES", "2048" if smoke_test else None)
-max_eval_samples = os.environ.get("MAX_EVAL_SAMPLES", "256" if smoke_test else None)
+max_eval_samples = os.environ.get("MAX_EVAL_SAMPLES", "256" if smoke_test else "8192")
 metric_for_best_model = os.environ.get("METRIC_FOR_BEST_MODEL", "eval_accuracy")
 greater_is_better = _env_flag("GREATER_IS_BETTER", True)
 min_suffix_tokens = os.environ.get("MIN_SUFFIX_TOKENS", "16")
@@ -168,8 +171,8 @@ overwrite_output_dir = _env_flag("OVERWRITE_OUTPUT_DIR", smoke_test)
 # Large batch + dynamic padding on 0.6B bf16 makes gradient_checkpointing unnecessary.
 # Keep it as an opt-in escape hatch for when you push batch size even higher.
 gradient_checkpointing = _env_flag("GRADIENT_CHECKPOINTING", False)
-group_by_length = _env_flag("GROUP_BY_LENGTH", False)
-remove_unused_columns = _env_flag("REMOVE_UNUSED_COLUMNS", True)
+group_by_length = _env_flag("GROUP_BY_LENGTH", not smoke_test)
+remove_unused_columns = _env_flag("REMOVE_UNUSED_COLUMNS", False)
 
 cmd_parts = [
     shlex.quote(torchrun_bin),
@@ -226,7 +229,13 @@ _append_optional_arg(cmd_parts, "--max_steps", max_steps)
 _append_optional_arg(cmd_parts, "--max_train_samples", max_train_samples)
 _append_optional_arg(cmd_parts, "--max_eval_samples", max_eval_samples)
 
-train_cmd = f"CUDA_VISIBLE_DEVICES={cuda_visible_devices} " + " ".join(cmd_parts)
+train_env = [f"CUDA_VISIBLE_DEVICES={cuda_visible_devices}"]
+if pytorch_cuda_alloc_conf:
+    train_env.insert(
+        0,
+        f"PYTORCH_CUDA_ALLOC_CONF={shlex.quote(pytorch_cuda_alloc_conf)}",
+    )
+train_cmd = " ".join(train_env + cmd_parts)
 cmd = """tmux new -s %s -d '{
 {
 set -x
