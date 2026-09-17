@@ -58,6 +58,14 @@ class ScriptArguments:
         metadata={"help": "是否允许使用历史已测状态；单次运行内始终去重"},
     )
     is_build: bool = field(default=False, metadata={"help": "是否做实际构建测试"})
+    build_timeout: int = field(
+        default=30,
+        metadata={"help": "单个候选的TVM构建超时秒数"},
+    )
+    build_n_parallel: int = field(
+        default=16,
+        metadata={"help": "每个worker并行构建数；多GPU分片时不要使用CPU总核数"},
+    )
     max_retries: int = field(
         default=20,
         metadata={"help": "每个 workload 为达到 keep_cnt 最多生成多少轮"},
@@ -70,6 +78,14 @@ class ScriptArguments:
         default=None,
         metadata={"help": "生成统计 JSON；默认使用 <save_path>.stats.json"},
     )
+    resume_path: str = field(
+        default=None,
+        metadata={"help": "已有分片记录；已达到keep_cnt的workload将跳过并保留"},
+    )
+    max_empty_rounds: int = field(
+        default=5,
+        metadata={"help": "连续没有新增候选时提前结束该workload"},
+    )
     trust_remote_code: bool = field(
         default=True,
         metadata={"help": "是否信任远程模型代码"},
@@ -81,6 +97,10 @@ class ScriptArguments:
     do_sample: bool = field(
         default=True,
         metadata={"help": "是否启用采样。对新结构化 checkpoint 默认建议开启"},
+    )
+    generation_seed: int = field(
+        default=0,
+        metadata={"help": "模型采样和候选截取的随机种子"},
     )
     disable_eos_stop: bool = field(
         default=False,
@@ -125,6 +145,18 @@ class ScriptArguments:
     generation_batch_size: int = field(
         default=32,
         metadata={"help": "生成阶段的 batch size。更长后缀推荐使用更小 batch"},
+    )
+    adaptive_generation: bool = field(
+        default=True,
+        metadata={"help": "根据尚缺候选数和历史通过率动态缩小每轮生成prompt数"},
+    )
+    initial_acceptance_estimate: float = field(
+        default=0.33,
+        metadata={"help": "自适应首轮预估的prompt到可构建候选通过率"},
+    )
+    min_generation_prompts: int = field(
+        default=8,
+        metadata={"help": "自适应模式每轮最少使用的prompt数"},
     )
     sample_top_k: int = field(
         default=0,
@@ -266,9 +298,12 @@ def worker(
     tokenizer_path,
     model_name_or_path,
     device,
+    generation_seed,
     allow_repeat,
     keep_cnt,
     is_build,
+    build_timeout,
+    build_n_parallel,
     trust_remote_code,
     fix_mistral_regex,
     use_model,
@@ -277,9 +312,17 @@ def worker(
     min_gen_tokens,
     gen_token_scale,
     generation_batch_size,
+    adaptive_generation,
+    initial_acceptance_estimate,
+    min_generation_prompts,
+    max_empty_rounds,
     max_retries,
 ):
     try:
+        random.seed(generation_seed)
+        torch.manual_seed(generation_seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(generation_seed)
         tokenizer = None
         model = None
         if use_model:
@@ -293,7 +336,10 @@ def worker(
                     model.generation_config.top_k = None
             model.eval()
 
-        builder = auto_scheduler.measure.LocalBuilder(timeout=30)
+        builder = auto_scheduler.measure.LocalBuilder(
+            timeout=build_timeout,
+            n_parallel=build_n_parallel,
+        )
         with open(save_path_i, "w"):
             pass
 
@@ -305,6 +351,10 @@ def worker(
                 "device": device,
                 "input_sketches": len(inputs),
                 "generation_rounds": 0,
+                "generation_prompts": 0,
+                "generation_seconds": 0.0,
+                "generation_token_budget": 0,
+                "generation_token_budget_max": 0,
                 "parsed_states": 0,
                 "fallback_rounds": 0,
                 "fallback_states": 0,
@@ -312,11 +362,13 @@ def worker(
                 "history_skipped": 0,
                 "build_attempted": 0,
                 "build_valid": 0,
+                "build_seconds": 0.0,
                 "accepted_without_build": 0,
                 "build_error_counts": {},
                 "unique_accepted": 0,
                 "kept": 0,
                 "shortfall": 0,
+                "empty_rounds": 0,
             }
 
             def gen_func_inner(task, states, max_new_tokens):
@@ -324,6 +376,10 @@ def worker(
                     max_new_tokens,
                     min_gen_tokens=min_gen_tokens,
                     gen_token_scale=gen_token_scale,
+                )
+                stats["generation_token_budget"] += resolved_max_new_tokens * len(states)
+                stats["generation_token_budget_max"] = max(
+                    stats["generation_token_budget_max"], resolved_max_new_tokens
                 )
                 gen_kwargs["max_new_tokens"] = resolved_max_new_tokens
                 return gen_func(
@@ -342,21 +398,48 @@ def worker(
             measure_inputs = []
             measure_results = []
             candidate_set = set()
+            input_states = [inp.state for inp in inputs]
+            input_cursor = 0
+            workload_started = time.perf_counter()
+            no_progress_rounds = 0
 
             retry_i = 0
             while retry_i < max_retries:
                 stats["generation_rounds"] += 1
+                remaining = max(keep_cnt - len(measure_inputs), 1)
+                if adaptive_generation:
+                    if stats["generation_prompts"]:
+                        acceptance_rate = len(measure_inputs) / stats["generation_prompts"]
+                        acceptance_rate = min(max(acceptance_rate, 0.05), 1.0)
+                    else:
+                        acceptance_rate = initial_acceptance_estimate
+                    prompt_count = math.ceil(remaining / acceptance_rate)
+                    prompt_count = min(
+                        len(input_states),
+                        max(min_generation_prompts, prompt_count),
+                    )
+                    round_states = [
+                        input_states[(input_cursor + offset) % len(input_states)]
+                        for offset in range(prompt_count)
+                    ]
+                    input_cursor = (input_cursor + prompt_count) % len(input_states)
+                else:
+                    round_states = input_states
+
+                stats["generation_prompts"] += len(round_states)
+                generation_started = time.perf_counter()
                 if use_model:
                     all_state_list = policy.gen_states(
-                        [inp.state for inp in inputs], gen_func_inner
+                        round_states, gen_func_inner
                     )
                     stats["parsed_states"] += len(all_state_list)
                 else:
-                    all_state_list = [inp.state for inp in inputs]
+                    all_state_list = round_states
                     stats["parsed_states"] += len(all_state_list)
+                stats["generation_seconds"] += time.perf_counter() - generation_started
 
                 if len(all_state_list) == 0 and fallback_to_sketch_when_invalid:
-                    all_state_list = [inp.state for inp in inputs]
+                    all_state_list = round_states
                     stats["fallback_rounds"] += 1
                     stats["fallback_states"] += len(all_state_list)
 
@@ -374,11 +457,13 @@ def worker(
                     measure_inputs_tmp.append(inp)
 
                 default_build_result = auto_scheduler.measure.BuildResult(None, [], 0, None, 0)
+                build_started = time.perf_counter()
                 if is_build:
                     stats["build_attempted"] += len(measure_inputs_tmp)
                     build_results = builder.build(measure_inputs_tmp) if measure_inputs_tmp else []
                 else:
                     build_results = [default_build_result for _ in measure_inputs_tmp]
+                stats["build_seconds"] += time.perf_counter() - build_started
 
                 for res, inp in zip(build_results, measure_inputs_tmp):
                     if res.error_no == 0:
@@ -396,8 +481,22 @@ def worker(
                             stats["build_error_counts"].get(error_no, 0) + 1
                         )
 
+                if len(measure_inputs) == stats["unique_accepted"]:
+                    no_progress_rounds += 1
+                else:
+                    no_progress_rounds = 0
+                stats["unique_accepted"] = len(measure_inputs)
+                stats["empty_rounds"] = no_progress_rounds
+
                 retry_i += 1
                 if len(measure_inputs) >= keep_cnt:
+                    break
+                if no_progress_rounds >= max_empty_rounds:
+                    print(
+                        f"[EARLY_STOP] device={device} no new candidates for "
+                        f"{max_empty_rounds} rounds workload={workload_key}",
+                        flush=True,
+                    )
                     break
                 if not use_model:
                     break
@@ -412,12 +511,18 @@ def worker(
 
             stats["kept"] = len(measure_inputs)
             stats["shortfall"] = max(keep_cnt - len(measure_inputs), 0)
+            stats["elapsed_seconds"] = time.perf_counter() - workload_started
             worker_stats.append(stats)
             status = "OK" if stats["shortfall"] == 0 else "SHORTFALL"
             print(
                 f"[{status}] device={device} kept={stats['kept']}/{keep_cnt} "
-                f"rounds={stats['generation_rounds']} parsed={stats['parsed_states']} "
-                f"build_valid={stats['build_valid']} duplicates={stats['duplicates']} "
+                f"rounds={stats['generation_rounds']} prompts={stats['generation_prompts']} "
+                f"parsed={stats['parsed_states']} build_valid={stats['build_valid']} "
+                f"token_budget={stats['generation_token_budget']} "
+                f"max_new_tokens={stats['generation_token_budget_max']} "
+                f"gen_s={stats['generation_seconds']:.2f} "
+                f"build_s={stats['build_seconds']:.2f} "
+                f"elapsed_s={stats['elapsed_seconds']:.2f} duplicates={stats['duplicates']} "
                 f"workload={workload_key}",
                 flush=True,
             )
@@ -457,10 +562,23 @@ def _atomic_merge_parts(part_paths, save_path):
             os.remove(tmp_path)
 
 
+def _completed_workloads(record_path, keep_cnt):
+    """Return workload keys that already have enough records in a partial shard."""
+    inputs, _ = auto_scheduler.RecordReader(record_path).read_lines()
+    counts = {}
+    for inp in inputs:
+        key = inp.task.workload_key
+        counts[key] = counts.get(key, 0) + 1
+    return {key for key, count in counts.items() if count >= keep_cnt}
+
+
 def _make_stats_payload(script_args, workload_stats, worker_errors):
     total_fields = (
         "input_sketches",
         "generation_rounds",
+        "generation_prompts",
+        "generation_seconds",
+        "generation_token_budget",
         "parsed_states",
         "fallback_rounds",
         "fallback_states",
@@ -468,12 +586,19 @@ def _make_stats_payload(script_args, workload_stats, worker_errors):
         "history_skipped",
         "build_attempted",
         "build_valid",
+        "build_seconds",
         "accepted_without_build",
         "unique_accepted",
         "kept",
         "shortfall",
+        "elapsed_seconds",
+        "empty_rounds",
     )
     totals = {field: sum(item[field] for item in workload_stats) for field in total_fields}
+    totals["generation_token_budget_max"] = max(
+        (item["generation_token_budget_max"] for item in workload_stats),
+        default=0,
+    )
     build_error_counts = {}
     for item in workload_stats:
         for error_no, count in item["build_error_counts"].items():
@@ -486,8 +611,22 @@ def _make_stats_payload(script_args, workload_stats, worker_errors):
         "keep_cnt": script_args.keep_cnt,
         "max_retries": script_args.max_retries,
         "is_build": script_args.is_build,
+        "build_timeout": script_args.build_timeout,
+        "build_n_parallel": script_args.build_n_parallel,
+        "adaptive_generation": script_args.adaptive_generation,
+        "initial_acceptance_estimate": script_args.initial_acceptance_estimate,
+        "min_generation_prompts": script_args.min_generation_prompts,
+        "generation_batch_size": script_args.generation_batch_size,
+        "generation_seed": script_args.generation_seed,
+        "min_gen_tokens": script_args.min_gen_tokens,
+        "gen_token_scale": script_args.gen_token_scale,
         "allow_historical_repeat": script_args.allow_repeat,
         "require_full_keep_cnt": script_args.require_full_keep_cnt,
+        "resume_path": os.path.abspath(script_args.resume_path)
+        if script_args.resume_path
+        else None,
+        "max_empty_rounds": script_args.max_empty_rounds,
+        "resumed_workload_count": getattr(script_args, "resumed_workload_count", 0),
         "workload_count": len(workload_stats),
         "totals": totals,
         "worker_errors": worker_errors,
@@ -504,6 +643,16 @@ def main():
         raise ValueError("--keep_cnt must be positive")
     if script_args.max_retries <= 0:
         raise ValueError("--max_retries must be positive")
+    if script_args.build_timeout <= 0:
+        raise ValueError("--build_timeout must be positive")
+    if script_args.build_n_parallel <= 0:
+        raise ValueError("--build_n_parallel must be positive")
+    if not 0 < script_args.initial_acceptance_estimate <= 1:
+        raise ValueError("--initial_acceptance_estimate must be in (0, 1]")
+    if script_args.min_generation_prompts <= 0:
+        raise ValueError("--min_generation_prompts must be positive")
+    if script_args.max_empty_rounds <= 0:
+        raise ValueError("--max_empty_rounds must be positive")
 
     os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
@@ -564,6 +713,33 @@ def main():
         sketch_dic.setdefault(workload_key, []).append(inp)
 
     sketch_dic_list = list(sketch_dic.items())
+    resumed_workload_count = 0
+    if script_args.resume_path:
+        if not os.path.isfile(script_args.resume_path):
+            raise FileNotFoundError(f"Resume records not found: {script_args.resume_path}")
+        completed = _completed_workloads(script_args.resume_path, script_args.keep_cnt)
+        resumed_workload_count = sum(1 for key, _ in sketch_dic_list if key in completed)
+        sketch_dic_list = [
+            item for item in sketch_dic_list if item[0] not in completed
+        ]
+        script_args.resumed_workload_count = resumed_workload_count
+        print(
+            f"Resume records: {resumed_workload_count} complete workloads; "
+            f"remaining={len(sketch_dic_list)}",
+            flush=True,
+        )
+
+    if not sketch_dic_list:
+        stats_path = script_args.stats_path or f"{script_args.save_path}.stats.json"
+        _atomic_write_json(
+            stats_path,
+            _make_stats_payload(script_args, [], []),
+        )
+        _atomic_merge_parts([script_args.resume_path], script_args.save_path)
+        print(f"Generation stats: {os.path.abspath(stats_path)}")
+        print(f"Generated records: {os.path.abspath(script_args.save_path)}")
+        return
+
     num_gpus = torch.cuda.device_count()
     if num_gpus <= 0:
         raise RuntimeError("No GPU found. This script requires CUDA devices.")
@@ -572,7 +748,7 @@ def main():
     per_len = math.ceil(len(sketch_dic_list) / num_workers)
     tmp_folder = tempfile.mkdtemp(prefix=".gen_state-", dir=CUR_DIR)
     processes = []
-    part_paths = []
+    part_paths = [script_args.resume_path] if script_args.resume_path else []
     result_queue = Queue()
 
     try:
@@ -594,9 +770,12 @@ def main():
                     script_args.model_name_or_path,
                     script_args.model_name_or_path,
                     device,
+                    script_args.generation_seed + worker_i,
                     script_args.allow_repeat,
                     script_args.keep_cnt,
                     script_args.is_build,
+                    script_args.build_timeout,
+                    script_args.build_n_parallel,
                     script_args.trust_remote_code,
                     script_args.fix_mistral_regex,
                     script_args.use_model,
@@ -605,6 +784,10 @@ def main():
                     script_args.min_gen_tokens,
                     script_args.gen_token_scale,
                     script_args.generation_batch_size,
+                    script_args.adaptive_generation,
+                    script_args.initial_acceptance_estimate,
+                    script_args.min_generation_prompts,
+                    script_args.max_empty_rounds,
                     script_args.max_retries,
                 ),
             )
@@ -612,17 +795,23 @@ def main():
             processes.append(process)
             part_paths.append(part_path)
 
+        worker_results = []
+        pending_results = len(processes)
+        while pending_results:
+            try:
+                worker_results.append(result_queue.get(timeout=5))
+                pending_results -= 1
+            except Empty:
+                if all(not process.is_alive() for process in processes):
+                    break
+
         for process in processes:
             process.join()
 
-        worker_results = []
-        for _ in processes:
-            try:
-                worker_results.append(result_queue.get(timeout=5))
-            except Empty:
-                worker_results.append(
-                    {"ok": False, "device": "unknown", "error": "worker returned no result"}
-                )
+        while len(worker_results) < len(processes):
+            worker_results.append(
+                {"ok": False, "device": "unknown", "error": "worker returned no result"}
+            )
 
         worker_errors = [result for result in worker_results if not result["ok"]]
         for process in processes:

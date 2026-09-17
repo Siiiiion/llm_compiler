@@ -238,6 +238,39 @@ cd gen
     A cost of `1e10` is TVM's failure sentinel, not latency. Such a record has a non-zero
     `r[1]` error code and must not be used for tuning or training.
 
+    Before using a merged measurement file for DPO/LAPO preference construction, split it
+    into one standard TVM record file per workload:
+
+    ```shell
+    /home/qsy/anaconda3/envs/tlm/bin/python split_measure_records.py \
+      --input-path=/home/qsy/workspace/gen_data/qwen3_0_6b_seq128_gen_train/measured_gen_train.json \
+      --output-dir=/home/qsy/workspace/gen_data/qwen3_0_6b_seq128_gen_train/measured_by_workload \
+      --overwrite
+    ```
+
+    `build_preference_pairs.py` expects this per-workload layout. Passing a directory that
+    contains only one merged multi-workload JSON file assigns the first record's DAG to the
+    other workloads and produces invalid preference data.
+
+    Classify a full-registry measurement run by network and input shape, then compare the
+    best valid schedule latency with the canonical measurement dataset:
+
+    ```shell
+    /home/qsy/anaconda3/envs/tlm/bin/python classify_network_speedup.py \
+      --baseline-path=/data3/qsy/dataset/measure_records/4090 \
+      --lapo-path=/home/qsy/workspace/gen_data/4090_full_lapo/lapo_measured.json \
+      --network-info-dir=/home/qsy/workspace/dataset/network_info/4090 \
+      --output-dir=/home/qsy/workspace/gen_data/4090_full_lapo/network_speedup
+    ```
+
+    The command writes `network_speedup_summary.csv`, `variant_speedup_summary.csv`,
+    `workload_speedup_details.csv`, `network_speedup_report.json`, and
+    `classification.log`. Its speedup is `best baseline latency / best LAPO latency` for
+    each commonly measured workload. The geometric means and task-weighted latency sums
+    are task-level proxy metrics, not end-to-end model latency. Use
+    `benchmark_relay_batch.py` when a real per-network Relay compilation and GPU benchmark
+    is required.
+
     For workloads with very large inputs, such as an FP16 vocabulary projection with a
     roughly 500 MiB weight tensor, the default five-second `LocalRunner` timeout can expire
     while the runner prepares inputs. Diagnose one record before treating `error_no=4` as an

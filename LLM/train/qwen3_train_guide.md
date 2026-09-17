@@ -859,6 +859,19 @@ CUDA_VISIBLE_DEVICES=0 /home/qsy/anaconda3/envs/tlm/bin/python measure_programs.
 
 > v2 修复：移除旧脚本硬编码的 `CUDA_VISIBLE_DEVICES="3"`；删除名存实亡的 `--start-idx / --end-idx / --step-idx` 参数；修复 resume 能力缺失。
 
+如果输入来自 `gen_state.py --save_path ...json`，测量产物是包含多个 workload 的合并 JSONL。
+`build_preference_pairs.py` 要求每个文件只包含一个 workload，必须先拆分：
+
+```bash
+/home/qsy/anaconda3/envs/tlm/bin/python split_measure_records.py \
+  --input-path /path/to/measured_gen_train.json \
+  --output-dir /path/to/measured_by_workload \
+  --overwrite
+```
+
+拆分工具保持 TVM 标准 workload 文件名，支持后续文件级 train/validation 划分。不要直接把只含一个
+合并 JSON 的目录传给 `build_preference_pairs.py`，否则它会用第一条记录的 DAG 解释其他 workload。
+
 ### 15.1 第一步：构造偏好对数据集
 
 **硬前提**：必须先跑完 §15.0，让 `/data3/qsy/dataset/measure_records/4090/*.json` 中每条记录的

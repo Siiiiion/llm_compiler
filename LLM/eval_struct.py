@@ -448,10 +448,18 @@ class CliArgs:
 def _load_model_tokenizer(args: CliArgs):
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
-    tok = AutoTokenizer.from_pretrained(
-        args.tokenizer_name or args.model_name_or_path,
-        trust_remote_code=args.trust_remote_code,
-    )
+    tokenizer_kwargs = {"trust_remote_code": args.trust_remote_code, "fix_mistral_regex": True}
+    try:
+        tok = AutoTokenizer.from_pretrained(
+            args.tokenizer_name or args.model_name_or_path,
+            **tokenizer_kwargs,
+        )
+    except TypeError:
+        tokenizer_kwargs.pop("fix_mistral_regex", None)
+        tok = AutoTokenizer.from_pretrained(
+            args.tokenizer_name or args.model_name_or_path,
+            **tokenizer_kwargs,
+        )
     if tok.pad_token_id is None and tok.eos_token_id is not None:
         tok.pad_token = tok.eos_token
 

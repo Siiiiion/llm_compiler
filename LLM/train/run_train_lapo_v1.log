@@ -1,0 +1,348 @@
++ echo '#################################################################'
+#################################################################
++ date
+Mon Jul 20 17:07:44 CST 2026
++ echo 'training_mode=lapo policy=/home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-ext-b2 ref=/home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-ext-b2 prefs=/home/qsy/workspace/dataset/lapo_dataset_v1'
+training_mode=lapo policy=/home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-ext-b2 ref=/home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-ext-b2 prefs=/home/qsy/workspace/dataset/lapo_dataset_v1
++ export PYTHONUNBUFFERED=1
++ PYTHONUNBUFFERED=1
++ CUDA_VISIBLE_DEVICES=0,1,2,3
++ /home/qsy/anaconda3/envs/tlm/bin/torchrun --nproc_per_node=4 --master_port=29543 /data3/qsy/complier/llm_compiler/LLM/train/train_qwen3_dpo.py --do_train --do_eval --model_name_or_path=/home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-ext-b2 --ref_model_name_or_path=/home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-ext-b2 --tokenizer_name=/home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-ext-b2 --output_dir=/home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1 --preference_dataset=/home/qsy/workspace/dataset/lapo_dataset_v1 --training_mode=lapo --beta=0.1 --loss_type=sigmoid --label_smoothing=0.0 --lapo_weight_clip=5.0 --lapo_normalize=True --max_prompt_length=512 --max_length=1024 --sample_seed=42 --per_device_train_batch_size=1 --per_device_eval_batch_size=1 --gradient_accumulation_steps=8 --logging_steps=5 --num_train_epochs=1 --learning_rate=5e-7 --save_strategy=steps --save_steps=10 --save_total_limit=3 --dataloader_num_workers=4 --dataloader_persistent_workers=True --bf16=True --gradient_checkpointing=False --group_by_length=False --remove_unused_columns=False --report_to=none --eval_strategy=steps --eval_steps=10 --ddp_find_unused_parameters=False --warmup_ratio=0.03 --load_best_model_at_end=True --metric_for_best_model=eval_loss --greater_is_better=False
+[2026-07-20 17:07:46,450] torch.distributed.run: [WARNING] 
+[2026-07-20 17:07:46,450] torch.distributed.run: [WARNING] *****************************************
+[2026-07-20 17:07:46,450] torch.distributed.run: [WARNING] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+[2026-07-20 17:07:46,450] torch.distributed.run: [WARNING] *****************************************
+07/20/2026 17:07:50 - WARNING - __main__ - Process rank: 3, device: cuda:3, n_gpu: 1, distributed training: True, bf16: True, training_mode: lapo
+07/20/2026 17:07:50 - WARNING - __main__ - Process rank: 0, device: cuda:0, n_gpu: 1, distributed training: True, bf16: True, training_mode: lapo
+[INFO|tokenization_utils_base.py:2109] 2026-07-20 17:07:50,524 >> loading file vocab.json
+[INFO|tokenization_utils_base.py:2109] 2026-07-20 17:07:50,524 >> loading file merges.txt
+[INFO|tokenization_utils_base.py:2109] 2026-07-20 17:07:50,524 >> loading file tokenizer.json
+[INFO|tokenization_utils_base.py:2109] 2026-07-20 17:07:50,525 >> loading file added_tokens.json
+[INFO|tokenization_utils_base.py:2109] 2026-07-20 17:07:50,525 >> loading file special_tokens_map.json
+[INFO|tokenization_utils_base.py:2109] 2026-07-20 17:07:50,525 >> loading file tokenizer_config.json
+[INFO|tokenization_utils_base.py:2109] 2026-07-20 17:07:50,525 >> loading file chat_template.jinja
+07/20/2026 17:07:50 - WARNING - __main__ - Process rank: 2, device: cuda:2, n_gpu: 1, distributed training: True, bf16: True, training_mode: lapo
+[INFO|tokenization_utils_base.py:2380] 2026-07-20 17:07:50,860 >> Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained.
+07/20/2026 17:07:51 - WARNING - __main__ - Process rank: 1, device: cuda:1, n_gpu: 1, distributed training: True, bf16: True, training_mode: lapo
+07/20/2026 17:07:51 - INFO - datasets.builder - Using custom data configuration default-d95833843b67f5c1
+07/20/2026 17:07:51 - INFO - datasets.info - Loading Dataset Infos from /home/qsy/anaconda3/envs/tlm/lib/python3.10/site-packages/datasets/packaged_modules/json
+07/20/2026 17:07:51 - INFO - datasets.builder - Overwrite dataset info from restored data version.
+07/20/2026 17:07:51 - INFO - datasets.info - Loading Dataset info from /data3/qsy/huggingface/datasets/json/default-d95833843b67f5c1/0.0.0/0f7e3662623656454fcd2b650f34e886a7db4b9104504885bd462096cc7a9f51
+07/20/2026 17:07:51 - WARNING - datasets.builder - Found cached dataset json (/data3/qsy/huggingface/datasets/json/default-d95833843b67f5c1/0.0.0/0f7e3662623656454fcd2b650f34e886a7db4b9104504885bd462096cc7a9f51)
+07/20/2026 17:07:51 - INFO - datasets.info - Loading Dataset info from /data3/qsy/huggingface/datasets/json/default-d95833843b67f5c1/0.0.0/0f7e3662623656454fcd2b650f34e886a7db4b9104504885bd462096cc7a9f51
+  0%|          | 0/2 [00:00<?, ?it/s]100%|██████████| 2/2 [00:00<00:00, 556.83it/s]
+07/20/2026 17:07:51 - WARNING - datasets.builder - Found cached dataset json (/data3/qsy/huggingface/datasets/json/default-d95833843b67f5c1/0.0.0/0f7e3662623656454fcd2b650f34e886a7db4b9104504885bd462096cc7a9f51)
+  0%|          | 0/2 [00:00<?, ?it/s]100%|██████████| 2/2 [00:00<00:00, 399.63it/s]
+Tokenizing preference pairs:   0%|          | 0/884 [00:00<?, ? examples/s]07/20/2026 17:07:51 - WARNING - datasets.builder - Found cached dataset json (/data3/qsy/huggingface/datasets/json/default-d95833843b67f5c1/0.0.0/0f7e3662623656454fcd2b650f34e886a7db4b9104504885bd462096cc7a9f51)
+  0%|          | 0/2 [00:00<?, ?it/s]100%|██████████| 2/2 [00:00<00:00, 416.33it/s]
+Tokenizing preference pairs:   0%|          | 0/884 [00:00<?, ? examples/s]Tokenizing preference pairs:   7%|▋         | 65/884 [00:00<00:01, 635.26 examples/s]Tokenizing preference pairs:   0%|          | 0/884 [00:00<?, ? examples/s]Tokenizing preference pairs:   5%|▍         | 41/884 [00:00<00:02, 394.53 examples/s]Tokenizing preference pairs:  18%|█▊        | 158/884 [00:00<00:01, 623.32 examples/s]Tokenizing preference pairs:   5%|▍         | 44/884 [00:00<00:01, 428.80 examples/s]Tokenizing preference pairs:  10%|▉         | 86/884 [00:00<00:01, 421.87 examples/s]Tokenizing preference pairs:  10%|▉         | 88/884 [00:00<00:01, 431.42 examples/s]Tokenizing preference pairs:  16%|█▌        | 139/884 [00:00<00:01, 466.97 examples/s]Tokenizing preference pairs:  27%|██▋       | 241/884 [00:00<00:01, 581.90 examples/s]Tokenizing preference pairs:  15%|█▌        | 135/884 [00:00<00:01, 444.03 examples/s]Tokenizing preference pairs:  24%|██▍       | 210/884 [00:00<00:01, 557.42 examples/s]Tokenizing preference pairs:  34%|███▍      | 302/884 [00:00<00:00, 585.47 examples/s]Tokenizing preference pairs:  21%|██        | 182/884 [00:00<00:01, 449.50 examples/s]Tokenizing preference pairs:  33%|███▎      | 291/884 [00:00<00:00, 646.25 examples/s]Tokenizing preference pairs:  43%|████▎     | 380/884 [00:00<00:00, 553.14 examples/s]Tokenizing preference pairs:  26%|██▌       | 228/884 [00:00<00:01, 446.96 examples/s]Tokenizing preference pairs:  42%|████▏     | 368/884 [00:00<00:00, 685.64 examples/s]Tokenizing preference pairs:  32%|███▏      | 287/884 [00:00<00:01, 493.66 examples/s]Tokenizing preference pairs:  50%|█████     | 445/884 [00:00<00:00, 508.34 examples/s]07/20/2026 17:07:52 - WARNING - datasets.builder - Found cached dataset json (/data3/qsy/huggingface/datasets/json/default-d95833843b67f5c1/0.0.0/0f7e3662623656454fcd2b650f34e886a7db4b9104504885bd462096cc7a9f51)
+  0%|          | 0/2 [00:00<?, ?it/s]100%|██████████| 2/2 [00:00<00:00, 535.19it/s]
+Tokenizing preference pairs:  53%|█████▎    | 466/884 [00:00<00:00, 669.07 examples/s]Tokenizing preference pairs:  40%|███▉      | 351/884 [00:00<00:00, 537.57 examples/s]Tokenizing preference pairs:   0%|          | 0/884 [00:00<?, ? examples/s]Tokenizing preference pairs:  63%|██████▎   | 559/884 [00:00<00:00, 740.93 examples/s]Tokenizing preference pairs:  59%|█████▉    | 522/884 [00:00<00:00, 506.84 examples/s]Tokenizing preference pairs:  47%|████▋     | 419/884 [00:00<00:00, 579.36 examples/s]Tokenizing preference pairs:   5%|▌         | 45/884 [00:00<00:01, 431.89 examples/s]Tokenizing preference pairs:  66%|██████▋   | 586/884 [00:01<00:00, 535.54 examples/s]Tokenizing preference pairs:  55%|█████▍    | 483/884 [00:00<00:00, 594.44 examples/s]Tokenizing preference pairs:  75%|███████▍  | 660/884 [00:01<00:00, 711.74 examples/s]Tokenizing preference pairs:  10%|█         | 91/884 [00:00<00:01, 441.98 examples/s]Tokenizing preference pairs:  65%|██████▌   | 579/884 [00:01<00:00, 703.43 examples/s]Tokenizing preference pairs:  85%|████████▌ | 754/884 [00:01<00:00, 770.57 examples/s]Tokenizing preference pairs:  15%|█▌        | 137/884 [00:00<00:01, 447.91 examples/s]Tokenizing preference pairs:  74%|███████▍  | 653/884 [00:01<00:00, 498.68 examples/s]Tokenizing preference pairs:  21%|██        | 183/884 [00:00<00:01, 449.27 examples/s]Tokenizing preference pairs:  81%|████████  | 718/884 [00:01<00:00, 532.20 examples/s]Tokenizing preference pairs:  76%|███████▋  | 676/884 [00:01<00:00, 677.01 examples/s]Tokenizing preference pairs:  99%|█████████▉| 879/884 [00:01<00:00, 787.90 examples/s]Tokenizing preference pairs:  26%|██▋       | 234/884 [00:00<00:01, 466.46 examples/s]Tokenizing preference pairs:  87%|████████▋ | 768/884 [00:01<00:00, 739.44 examples/s]Tokenizing preference pairs:  89%|████████▉ | 791/884 [00:01<00:00, 511.67 examples/s]Tokenizing preference pairs:  34%|███▍      | 299/884 [00:00<00:01, 523.47 examples/s]Tokenizing preference pairs:  95%|█████████▌| 844/884 [00:01<00:00, 742.91 examples/s]                                                                                      Tokenizing preference pairs:  96%|█████████▌| 849/884 [00:01<00:00, 525.60 examples/s]Tokenizing preference pairs:   0%|          | 0/39 [00:00<?, ? examples/s]Tokenizing preference pairs:  40%|████      | 356/884 [00:00<00:00, 533.97 examples/s]                                                                          Filter:   0%|          | 0/884 [00:00<?, ? examples/s]                                                                                      Tokenizing preference pairs:  48%|████▊     | 425/884 [00:00<00:00, 501.83 examples/s]Tokenizing preference pairs:   0%|          | 0/39 [00:00<?, ? examples/s]                                                                                                                                                                Filter:   0%|          | 0/884 [00:00<?, ? examples/s]Tokenizing preference pairs:  57%|█████▋    | 503/884 [00:01<00:00, 505.44 examples/s]Tokenizing preference pairs:   0%|          | 0/39 [00:00<?, ? examples/s]Tokenizing preference pairs:  64%|██████▍   | 570/884 [00:01<00:00, 546.50 examples/s]                                                                          Filter:   0%|          | 0/884 [00:00<?, ? examples/s]Tokenizing preference pairs:  72%|███████▏  | 638/884 [00:01<00:00, 509.63 examples/s]Tokenizing preference pairs:  79%|███████▉  | 698/884 [00:01<00:00, 529.47 examples/s]Filter: 100%|██████████| 884/884 [00:00<00:00, 1402.64 examples/s]                                                                  Filter:   0%|          | 0/39 [00:00<?, ? examples/s]                                                     [WARNING|logging.py:328] 2026-07-20 17:07:54,144 >> `torch_dtype` is deprecated! Use `dtype` instead!
+Tokenizing preference pairs:  86%|████████▋ | 764/884 [00:01<00:00, 563.00 examples/s]Tokenizing preference pairs:  94%|█████████▍| 833/884 [00:01<00:00, 594.60 examples/s]Filter: 100%|██████████| 884/884 [00:00<00:00, 1374.08 examples/s]                                                                  Filter:   0%|          | 0/39 [00:00<?, ? examples/s]/data3/qsy/complier/llm_compiler/LLM/train/train_qwen3_dpo.py:397: FutureWarning: `tokenizer` is deprecated and will be removed in version 5.0.0 for `DPOTrainer.__init__`. Use `processing_class` instead.
+  super().__init__(*args, **kwargs)
+                                                     [WARNING|logging.py:328] 2026-07-20 17:07:54,378 >> `torch_dtype` is deprecated! Use `dtype` instead!
+Filter: 100%|██████████| 884/884 [00:00<00:00, 1421.83 examples/s]                                                                  Filter:   0%|          | 0/39 [00:00<?, ? examples/s]                                                     07/20/2026 17:07:54 - INFO - __main__ - train_dataset size = 884
+07/20/2026 17:07:54 - INFO - __main__ - eval_dataset size = 39
+[INFO|configuration_utils.py:763] 2026-07-20 17:07:54,481 >> loading configuration file /home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-ext-b2/config.json
+[INFO|configuration_utils.py:839] 2026-07-20 17:07:54,483 >> Model config Qwen3Config {
+  "architectures": [
+    "Qwen3ForCausalLM"
+  ],
+  "attention_bias": false,
+  "attention_dropout": 0.0,
+  "dtype": "bfloat16",
+  "eos_token_id": 151645,
+  "head_dim": 128,
+  "hidden_act": "silu",
+  "hidden_size": 1024,
+  "initializer_range": 0.02,
+  "intermediate_size": 3072,
+  "layer_types": [
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention"
+  ],
+  "max_position_embeddings": 40960,
+  "max_window_layers": 28,
+  "model_type": "qwen3",
+  "num_attention_heads": 16,
+  "num_hidden_layers": 28,
+  "num_key_value_heads": 8,
+  "pad_token_id": 151643,
+  "rms_norm_eps": 1e-06,
+  "rope_scaling": null,
+  "rope_theta": 1000000,
+  "sliding_window": null,
+  "tie_word_embeddings": true,
+  "transformers_version": "4.57.6",
+  "use_cache": true,
+  "use_sliding_window": false,
+  "vocab_size": 151712
+}
+
+[WARNING|logging.py:328] 2026-07-20 17:07:54,497 >> `torch_dtype` is deprecated! Use `dtype` instead!
+[INFO|modeling_utils.py:1169] 2026-07-20 17:07:54,497 >> loading weights file /home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-ext-b2/model.safetensors
+[INFO|modeling_utils.py:1243] 2026-07-20 17:07:54,498 >> Will use dtype=torch.bfloat16 as defined in model's config object
+[INFO|modeling_utils.py:2341] 2026-07-20 17:07:54,498 >> Instantiating Qwen3ForCausalLM model under default dtype torch.bfloat16.
+[INFO|configuration_utils.py:986] 2026-07-20 17:07:54,500 >> Generate config GenerationConfig {
+  "eos_token_id": 151645,
+  "pad_token_id": 151643
+}
+
+                                                                                      Tokenizing preference pairs:   0%|          | 0/39 [00:00<?, ? examples/s]/data3/qsy/complier/llm_compiler/LLM/train/train_qwen3_dpo.py:397: FutureWarning: `tokenizer` is deprecated and will be removed in version 5.0.0 for `DPOTrainer.__init__`. Use `processing_class` instead.
+  super().__init__(*args, **kwargs)
+[INFO|configuration_utils.py:939] 2026-07-20 17:07:54,622 >> loading configuration file /home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-ext-b2/generation_config.json
+[INFO|configuration_utils.py:986] 2026-07-20 17:07:54,622 >> Generate config GenerationConfig {
+  "do_sample": true,
+  "eos_token_id": [
+    151645,
+    151643
+  ],
+  "pad_token_id": 151643,
+  "temperature": 0.6,
+  "top_k": 20,
+  "top_p": 0.95
+}
+
+[INFO|dynamic_module_utils.py:423] 2026-07-20 17:07:54,623 >> Could not locate the custom_generate/generate.py inside /home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-ext-b2.
+07/20/2026 17:07:54 - INFO - __main__ - Loading reference model from /home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-ext-b2
+[INFO|configuration_utils.py:763] 2026-07-20 17:07:54,623 >> loading configuration file /home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-ext-b2/config.json
+[INFO|configuration_utils.py:839] 2026-07-20 17:07:54,624 >> Model config Qwen3Config {
+  "architectures": [
+    "Qwen3ForCausalLM"
+  ],
+  "attention_bias": false,
+  "attention_dropout": 0.0,
+  "dtype": "bfloat16",
+  "eos_token_id": 151645,
+  "head_dim": 128,
+  "hidden_act": "silu",
+  "hidden_size": 1024,
+  "initializer_range": 0.02,
+  "intermediate_size": 3072,
+  "layer_types": [
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention"
+  ],
+  "max_position_embeddings": 40960,
+  "max_window_layers": 28,
+  "model_type": "qwen3",
+  "num_attention_heads": 16,
+  "num_hidden_layers": 28,
+  "num_key_value_heads": 8,
+  "pad_token_id": 151643,
+  "rms_norm_eps": 1e-06,
+  "rope_scaling": null,
+  "rope_theta": 1000000,
+  "sliding_window": null,
+  "tie_word_embeddings": true,
+  "transformers_version": "4.57.6",
+  "use_cache": true,
+  "use_sliding_window": false,
+  "vocab_size": 151712
+}
+
+[INFO|modeling_utils.py:1169] 2026-07-20 17:07:54,624 >> loading weights file /home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-ext-b2/model.safetensors
+[INFO|modeling_utils.py:1243] 2026-07-20 17:07:54,625 >> Will use dtype=torch.bfloat16 as defined in model's config object
+[INFO|modeling_utils.py:2341] 2026-07-20 17:07:54,625 >> Instantiating Qwen3ForCausalLM model under default dtype torch.bfloat16.
+[INFO|configuration_utils.py:986] 2026-07-20 17:07:54,625 >> Generate config GenerationConfig {
+  "eos_token_id": 151645,
+  "pad_token_id": 151643
+}
+
+                                                                          Filter:   0%|          | 0/884 [00:00<?, ? examples/s][INFO|configuration_utils.py:939] 2026-07-20 17:07:54,739 >> loading configuration file /home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-ext-b2/generation_config.json
+[INFO|configuration_utils.py:986] 2026-07-20 17:07:54,739 >> Generate config GenerationConfig {
+  "do_sample": true,
+  "eos_token_id": [
+    151645,
+    151643
+  ],
+  "pad_token_id": 151643,
+  "temperature": 0.6,
+  "top_k": 20,
+  "top_p": 0.95
+}
+
+[INFO|dynamic_module_utils.py:423] 2026-07-20 17:07:54,739 >> Could not locate the custom_generate/generate.py inside /home/qsy/huggingface/model/Qwen3-0.6B-4090-struct-stage1-v2-ext-b2.
+/data3/qsy/complier/llm_compiler/LLM/train/train_qwen3_dpo.py:397: FutureWarning: `tokenizer` is deprecated and will be removed in version 5.0.0 for `DPOTrainer.__init__`. Use `processing_class` instead.
+  super().__init__(*args, **kwargs)
+[INFO|trainer.py:749] 2026-07-20 17:07:55,194 >> Using auto half precision backend
+Filter: 100%|██████████| 884/884 [00:00<00:00, 1402.93 examples/s]                                                                  Filter:   0%|          | 0/39 [00:00<?, ? examples/s]                                                     [WARNING|logging.py:328] 2026-07-20 17:07:55,329 >> `torch_dtype` is deprecated! Use `dtype` instead!
+/data3/qsy/complier/llm_compiler/LLM/train/train_qwen3_dpo.py:397: FutureWarning: `tokenizer` is deprecated and will be removed in version 5.0.0 for `DPOTrainer.__init__`. Use `processing_class` instead.
+  super().__init__(*args, **kwargs)
+[INFO|trainer.py:2519] 2026-07-20 17:07:56,667 >> ***** Running training *****
+[INFO|trainer.py:2520] 2026-07-20 17:07:56,667 >>   Num examples = 884
+[INFO|trainer.py:2521] 2026-07-20 17:07:56,667 >>   Num Epochs = 1
+[INFO|trainer.py:2522] 2026-07-20 17:07:56,667 >>   Instantaneous batch size per device = 1
+[INFO|trainer.py:2525] 2026-07-20 17:07:56,667 >>   Total train batch size (w. parallel, distributed & accumulation) = 32
+[INFO|trainer.py:2526] 2026-07-20 17:07:56,667 >>   Gradient Accumulation steps = 8
+[INFO|trainer.py:2527] 2026-07-20 17:07:56,667 >>   Total optimization steps = 28
+[INFO|trainer.py:2528] 2026-07-20 17:07:56,668 >>   Number of trainable parameters = 595,820,544
+  0%|          | 0/28 [00:00<?, ?it/s][WARNING|modeling_utils.py:1759] 2026-07-20 17:07:58,241 >> Could not estimate the number of tokens of the input, floating-point operations will not be computed
+[WARNING|modeling_utils.py:1759] 2026-07-20 17:07:58,248 >> Could not estimate the number of tokens of the input, floating-point operations will not be computed
+[WARNING|modeling_utils.py:1759] 2026-07-20 17:07:58,324 >> Could not estimate the number of tokens of the input, floating-point operations will not be computed
+[WARNING|modeling_utils.py:1759] 2026-07-20 17:07:58,332 >> Could not estimate the number of tokens of the input, floating-point operations will not be computed
+  4%|▎         | 1/28 [00:04<01:49,  4.06s/it]  7%|▋         | 2/28 [00:06<01:26,  3.33s/it] 11%|█         | 3/28 [00:09<01:14,  2.99s/it] 14%|█▍        | 4/28 [00:12<01:08,  2.84s/it] 18%|█▊        | 5/28 [00:14<01:03,  2.74s/it]                                              {'loss': 0.7078, 'grad_norm': 179.0, 'learning_rate': 4.444444444444444e-07, 'loss/dpo': 0.862480878829956, 'reward/chosen_mean': 0.02366485632956028, 'reward/rejected_mean': 0.3377678096294403, 'reward/accuracy': 0.0, 'reward/margin_mean': -0.3141029477119446, 'epoch': 0.18}
+ 18%|█▊        | 5/28 [00:14<01:03,  2.74s/it] 21%|██▏       | 6/28 [00:17<00:59,  2.69s/it] 25%|██▌       | 7/28 [00:19<00:55,  2.62s/it] 29%|██▊       | 8/28 [00:22<00:52,  2.62s/it] 32%|███▏      | 9/28 [00:24<00:49,  2.61s/it] 36%|███▌      | 10/28 [00:27<00:47,  2.61s/it]                                               {'loss': 0.711, 'grad_norm': 125.5, 'learning_rate': 3.5185185185185183e-07, 'loss/dpo': 0.6025800108909607, 'reward/chosen_mean': -0.08896102756261826, 'reward/rejected_mean': -0.27912217378616333, 'reward/accuracy': 1.0, 'reward/margin_mean': 0.19016113877296448, 'epoch': 0.36}
+ 36%|███▌      | 10/28 [00:27<00:47,  2.61s/it][INFO|trainer.py:4643] 2026-07-20 17:08:24,266 >> 
+***** Running Evaluation *****
+[INFO|trainer.py:4645] 2026-07-20 17:08:24,266 >>   Num examples = 39
+[INFO|trainer.py:4648] 2026-07-20 17:08:24,266 >>   Batch size = 1
+
+  0%|          | 0/10 [00:00<?, ?it/s][A
+ 20%|██        | 2/10 [00:00<00:00, 14.15it/s][A
+ 40%|████      | 4/10 [00:00<00:00,  9.00it/s][A
+ 60%|██████    | 6/10 [00:00<00:00,  7.52it/s][A
+ 70%|███████   | 7/10 [00:00<00:00,  7.20it/s][A
+ 80%|████████  | 8/10 [00:01<00:00,  7.19it/s][A
+ 90%|█████████ | 9/10 [00:01<00:00,  6.93it/s][A
+100%|██████████| 10/10 [00:01<00:00,  6.77it/s][A                                               
+                                               [A{'eval_loss': 0.6744908690452576, 'eval_runtime': 1.7152, 'eval_samples_per_second': 22.737, 'eval_steps_per_second': 5.83, 'loss/dpo': 0.7309049963951111, 'reward/chosen_mean': -0.048043061047792435, 'reward/rejected_mean': 0.02609863318502903, 'reward/accuracy': 0.0, 'reward/margin_mean': -0.07414169609546661, 'epoch': 0.36}
+ 36%|███▌      | 10/28 [00:29<00:47,  2.61s/it]
+100%|██████████| 10/10 [00:01<00:00,  6.77it/s][A
+                                               [A[INFO|trainer.py:4309] 2026-07-20 17:08:25,982 >> Saving model checkpoint to /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-10
+[INFO|configuration_utils.py:491] 2026-07-20 17:08:25,984 >> Configuration saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-10/config.json
+[INFO|configuration_utils.py:757] 2026-07-20 17:08:25,985 >> Configuration saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-10/generation_config.json
+[INFO|modeling_utils.py:4181] 2026-07-20 17:08:27,430 >> Model weights saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-10/model.safetensors
+[INFO|tokenization_utils_base.py:2561] 2026-07-20 17:08:27,431 >> chat template saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-10/chat_template.jinja
+[INFO|tokenization_utils_base.py:2730] 2026-07-20 17:08:27,432 >> tokenizer config file saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-10/tokenizer_config.json
+[INFO|tokenization_utils_base.py:2739] 2026-07-20 17:08:27,432 >> Special tokens file saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-10/special_tokens_map.json
+ 39%|███▉      | 11/28 [00:35<01:11,  4.22s/it] 43%|████▎     | 12/28 [00:37<00:59,  3.72s/it] 46%|████▋     | 13/28 [00:40<00:49,  3.28s/it] 50%|█████     | 14/28 [00:42<00:41,  2.97s/it] 54%|█████▎    | 15/28 [00:45<00:37,  2.86s/it]                                               {'loss': 0.7214, 'grad_norm': 123.5, 'learning_rate': 2.5925925925925923e-07, 'loss/dpo': 0.6290571689605713, 'reward/chosen_mean': 0.05922088772058487, 'reward/rejected_mean': -0.07334976643323898, 'reward/accuracy': 1.0, 'reward/margin_mean': 0.13257065415382385, 'epoch': 0.54}
+ 54%|█████▎    | 15/28 [00:45<00:37,  2.86s/it] 57%|█████▋    | 16/28 [00:47<00:32,  2.73s/it] 61%|██████    | 17/28 [00:49<00:28,  2.62s/it] 64%|██████▍   | 18/28 [00:52<00:25,  2.59s/it] 68%|██████▊   | 19/28 [00:54<00:22,  2.51s/it] 71%|███████▏  | 20/28 [00:57<00:19,  2.46s/it]                                               {'loss': 0.6982, 'grad_norm': 167.0, 'learning_rate': 1.6666666666666665e-07, 'loss/dpo': 0.7676057815551758, 'reward/chosen_mean': -0.05097656324505806, 'reward/rejected_mean': 0.092778779566288, 'reward/accuracy': 0.0, 'reward/margin_mean': -0.14375534653663635, 'epoch': 0.72}
+ 71%|███████▏  | 20/28 [00:57<00:19,  2.46s/it][INFO|trainer.py:4643] 2026-07-20 17:08:53,808 >> 
+***** Running Evaluation *****
+[INFO|trainer.py:4645] 2026-07-20 17:08:53,808 >>   Num examples = 39
+[INFO|trainer.py:4648] 2026-07-20 17:08:53,808 >>   Batch size = 1
+
+  0%|          | 0/10 [00:00<?, ?it/s][A
+ 20%|██        | 2/10 [00:00<00:00, 13.08it/s][A
+ 40%|████      | 4/10 [00:00<00:00,  8.86it/s][A
+ 50%|█████     | 5/10 [00:00<00:00,  7.96it/s][A
+ 60%|██████    | 6/10 [00:00<00:00,  7.45it/s][A
+ 70%|███████   | 7/10 [00:00<00:00,  7.17it/s][A
+ 80%|████████  | 8/10 [00:01<00:00,  7.11it/s][A
+ 90%|█████████ | 9/10 [00:01<00:00,  6.91it/s][A
+100%|██████████| 10/10 [00:01<00:00,  6.78it/s][A                                               
+                                               [A{'eval_loss': 0.7215967774391174, 'eval_runtime': 1.5286, 'eval_samples_per_second': 25.514, 'eval_steps_per_second': 6.542, 'loss/dpo': 0.5397540926933289, 'reward/chosen_mean': -0.22994385659694672, 'reward/rejected_mean': -0.5645988583564758, 'reward/accuracy': 1.0, 'reward/margin_mean': 0.3346549868583679, 'epoch': 0.72}
+ 71%|███████▏  | 20/28 [00:58<00:19,  2.46s/it]
+100%|██████████| 10/10 [00:01<00:00,  6.78it/s][A
+                                               [A[INFO|trainer.py:4309] 2026-07-20 17:08:55,337 >> Saving model checkpoint to /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-20
+[INFO|configuration_utils.py:491] 2026-07-20 17:08:55,338 >> Configuration saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-20/config.json
+[INFO|configuration_utils.py:757] 2026-07-20 17:08:55,339 >> Configuration saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-20/generation_config.json
+[INFO|modeling_utils.py:4181] 2026-07-20 17:08:56,673 >> Model weights saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-20/model.safetensors
+[INFO|tokenization_utils_base.py:2561] 2026-07-20 17:08:56,674 >> chat template saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-20/chat_template.jinja
+[INFO|tokenization_utils_base.py:2730] 2026-07-20 17:08:56,675 >> tokenizer config file saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-20/tokenizer_config.json
+[INFO|tokenization_utils_base.py:2739] 2026-07-20 17:08:56,675 >> Special tokens file saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-20/special_tokens_map.json
+ 75%|███████▌  | 21/28 [01:04<00:28,  4.00s/it] 79%|███████▊  | 22/28 [01:07<00:21,  3.52s/it] 82%|████████▏ | 23/28 [01:09<00:15,  3.16s/it] 86%|████████▌ | 24/28 [01:11<00:11,  2.99s/it] 89%|████████▉ | 25/28 [01:14<00:08,  2.87s/it]                                               {'loss': 0.6927, 'grad_norm': 131.0, 'learning_rate': 7.407407407407407e-08, 'loss/dpo': 0.8093448877334595, 'reward/chosen_mean': -0.19823913276195526, 'reward/rejected_mean': 0.0220489501953125, 'reward/accuracy': 0.0, 'reward/margin_mean': -0.22028808295726776, 'epoch': 0.9}
+ 89%|████████▉ | 25/28 [01:14<00:08,  2.87s/it] 93%|█████████▎| 26/28 [01:17<00:05,  2.79s/it] 96%|█████████▋| 27/28 [01:19<00:02,  2.73s/it]100%|██████████| 28/28 [01:21<00:00,  2.40s/it][INFO|trainer.py:4309] 2026-07-20 17:09:18,145 >> Saving model checkpoint to /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-28
+[INFO|configuration_utils.py:491] 2026-07-20 17:09:18,147 >> Configuration saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-28/config.json
+[INFO|configuration_utils.py:757] 2026-07-20 17:09:18,147 >> Configuration saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-28/generation_config.json
+[INFO|modeling_utils.py:4181] 2026-07-20 17:09:19,557 >> Model weights saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-28/model.safetensors
+[INFO|tokenization_utils_base.py:2561] 2026-07-20 17:09:19,558 >> chat template saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-28/chat_template.jinja
+[INFO|tokenization_utils_base.py:2730] 2026-07-20 17:09:19,559 >> tokenizer config file saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-28/tokenizer_config.json
+[INFO|tokenization_utils_base.py:2739] 2026-07-20 17:09:19,559 >> Special tokens file saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-28/special_tokens_map.json
+[WARNING|trainer.py:3163] 2026-07-20 17:09:19,917 >> There were missing keys in the checkpoint model loaded: ['lm_head.weight'].
+[WARNING|trainer.py:3163] 2026-07-20 17:09:19,940 >> There were missing keys in the checkpoint model loaded: ['lm_head.weight'].
+[WARNING|trainer.py:3163] 2026-07-20 17:09:19,940 >> There were missing keys in the checkpoint model loaded: ['lm_head.weight'].
+[INFO|trainer.py:2810] 2026-07-20 17:09:22,124 >> 
+
+Training completed. Do not forget to share your model on huggingface.co/models =)
+
+
+[INFO|trainer.py:3033] 2026-07-20 17:09:22,124 >> Loading best model from /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/checkpoint-10 (score: 0.6744908690452576).
+[WARNING|trainer.py:3163] 2026-07-20 17:09:22,301 >> There were missing keys in the checkpoint model loaded: ['lm_head.weight'].
+                                               {'train_runtime': 85.6512, 'train_samples_per_second': 10.321, 'train_steps_per_second': 0.327, 'train_loss': 0.7033313768250602, 'loss/dpo': 0.6474708318710327, 'reward/chosen_mean': -0.03190002590417862, 'reward/rejected_mean': -0.12543945014476776, 'reward/accuracy': 1.0, 'reward/margin_mean': 0.09353942424058914, 'epoch': 1.0}
+100%|██████████| 28/28 [01:25<00:00,  2.40s/it]100%|██████████| 28/28 [01:25<00:00,  3.06s/it]
+[INFO|trainer.py:4309] 2026-07-20 17:09:22,323 >> Saving model checkpoint to /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1
+[INFO|configuration_utils.py:491] 2026-07-20 17:09:22,324 >> Configuration saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/config.json
+[INFO|configuration_utils.py:757] 2026-07-20 17:09:22,325 >> Configuration saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/generation_config.json
+[INFO|modeling_utils.py:4181] 2026-07-20 17:09:23,688 >> Model weights saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/model.safetensors
+[INFO|tokenization_utils_base.py:2561] 2026-07-20 17:09:23,689 >> chat template saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/chat_template.jinja
+[INFO|tokenization_utils_base.py:2730] 2026-07-20 17:09:23,689 >> tokenizer config file saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/tokenizer_config.json
+[INFO|tokenization_utils_base.py:2739] 2026-07-20 17:09:23,689 >> Special tokens file saved in /home/qsy/huggingface/model/Qwen3-0.6B-4090-lapo-v1/special_tokens_map.json
+***** train metrics *****
+  epoch                    =        1.0
+  loss/dpo                 =     0.6475
+  reward/accuracy          =        1.0
+  reward/chosen_mean       =    -0.0319
+  reward/margin_mean       =     0.0935
+  reward/rejected_mean     =    -0.1254
+  total_flos               =        0GF
+  train_loss               =     0.7033
+  train_runtime            = 0:01:25.65
+  train_samples            =        884
+  train_samples_per_second =     10.321
+  train_steps_per_second   =      0.327
+  training_mode            =       lapo
+07/20/2026 17:09:23 - INFO - __main__ - *** Evaluate ***
+[INFO|trainer.py:4643] 2026-07-20 17:09:23,813 >> 
+***** Running Evaluation *****
+[INFO|trainer.py:4645] 2026-07-20 17:09:23,813 >>   Num examples = 39
+[INFO|trainer.py:4648] 2026-07-20 17:09:23,813 >>   Batch size = 1
+  0%|          | 0/10 [00:00<?, ?it/s] 20%|██        | 2/10 [00:00<00:00, 16.92it/s] 40%|████      | 4/10 [00:00<00:00, 10.66it/s] 60%|██████    | 6/10 [00:00<00:00,  9.28it/s] 80%|████████  | 8/10 [00:00<00:00,  9.04it/s] 90%|█████████ | 9/10 [00:00<00:00,  8.80it/s]100%|██████████| 10/10 [00:01<00:00,  8.67it/s]100%|██████████| 10/10 [00:01<00:00,  9.27it/s]
+***** eval metrics *****
+  epoch                   =        1.0
+  eval_loss               =     0.6745
+  eval_runtime            = 0:00:01.23
+  eval_samples            =         39
+  eval_samples_per_second =     31.517
+  eval_steps_per_second   =      8.081
+  loss/dpo                =     0.7309
+  perplexity              =      1.963
+  reward/accuracy         =        0.0
+  reward/chosen_mean      =     -0.048
+  reward/margin_mean      =    -0.0741
+  reward/rejected_mean    =     0.0261
++ date
+Mon Jul 20 17:09:52 CST 2026
