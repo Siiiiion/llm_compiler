@@ -1,24 +1,10 @@
-# LLM × TVM 自动调度项目：优化与论文规划
+# 项目规划导航
 
-本目录存放针对 `qusiyuan/projects/llm_compiler/LLM/` 子项目的**工程优化方案**与**毕业论文创新点设计**，用于后续复现和演进。
+LLM 的文档已统一到 [LLM/docs](../LLM/docs/README.md)。
 
-## 文件列表
+- [当前架构](../LLM/docs/ARCHITECTURE.md)：模块职责、调用关系与函数归属。
+- [当前路线图](../LLM/docs/ROADMAP.md)：当前工作、依赖顺序与验收边界。
+- [历史执行记录](../LLM/docs/history/README.md)：原 update_plan 的逐次实施与证据。
+- [研究设想](../LLM/docs/research/README.md)：原 plan 的优化、论文与实验设计。
 
-| 文件 | 内容 | 面向读者 |
-| --- | --- | --- |
-| `01_optimization_plan.md` | 现状梳理 + 分层优化（数据 / 训练 / 推理 / 词表 / 监控 / 工程质量）+ 落地路线图 + 风险提示 | 项目协作者、要动手优化代码的同学 |
-| `02_thesis_innovations.md` | 4 个可落地毕业论文创新点 + 组合策略 + 论文骨架 + 先置条件 | 要把本项目作为毕业论文主体的作者 |
-| `03_measure_record_format_thesis.md` | TVM 测量记录 JSONL 格式说明 + 面向论文写作的数据表示创新点描述 | 撰写数据表示与方法章节的作者 |
-| `04_experiment_plan.md` | 面向毕业论文/学术论文的多组实验设计、指标体系与执行优先级 | 规划和执行论文实验的作者 |
-
-## 阅读顺序建议
-
-1. **先读** `01_optimization_plan.md` 第 1 节（项目现状）和第 5 节（TL;DR）。
-2. **后读** `02_thesis_innovations.md` 的「总体定位」与「组合策略」两节，决定论文范围。
-3. 根据选中的创新点，回到 `01_optimization_plan.md` 查看必须先完成的工程先置条件（§3 路线图与 §5 TL;DR）。
-4. 在真正动手前，先过 `01_optimization_plan.md` §4 的风险与易踩坑清单。
-
-## 更新约定
-
-- 两份文档应与代码一起演进：凡在 `LLM/` 下合并任何与本规划相关的修改，PR 描述里注明对应章节编号，同时在对应 markdown 的对应条目后标 `✅` 或追加"落地日期 + commit"。
-- 新增创新点或调整实验设计时，在 `02_thesis_innovations.md` 追加「创新点 5 / 6 ...」并在本 README 文件表中记录。
+本目录保留旧文档链接，正文只在统一文档目录维护。

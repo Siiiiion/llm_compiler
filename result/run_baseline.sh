@@ -1,4 +1,7 @@
-nohup python /home/qsy/workspace/complier/llm_compiler/LLM/baseline.py --workload=bert_large \
+#!/usr/bin/env bash
+set -e
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+nohup python -m LLM baseline --workload=bert_large \
  --input-shape='[1,128]' \
  --target=nvidia/geforce-rtx-4090 \
  --backend=graph \

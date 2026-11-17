@@ -18,9 +18,9 @@ from tvm import auto_scheduler
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 LLM_DIR = SCRIPT_DIR.parent
-sys.path.insert(0, str(LLM_DIR))
+sys.path.insert(0, str(LLM_DIR.parent))
 
-import benchmark_relay as relay_benchmark  # noqa: E402
+import LLM.benchmark.benchmark_relay as relay_benchmark
 from metrics import atomic_json  # noqa: E402
 
 

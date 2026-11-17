@@ -12,6 +12,12 @@ import numpy as np
 import torch
 from datasets import load_from_disk
 
+REPOSITORY_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if REPOSITORY_ROOT not in sys.path:
+    sys.path.insert(0, REPOSITORY_ROOT)
+from LLM.data.make_dataset_utils import CLM_INTEGRITY_COLUMNS, validate_clm_dataset_integrity
+from LLM.core.tokenization_protocol import build_ppt_marker_id_candidates, find_ppt_marker_end
+
 # accelerate may access numpy._core on some versions; numpy 1.x only exposes numpy.core.
 if not hasattr(np, "_core") and hasattr(np, "core"):
     np._core = np.core
@@ -34,7 +40,6 @@ from transformers import (
     HfArgumentParser,
     Trainer,
     TrainingArguments,
-    default_data_collator,
     set_seed,
 )
 from transformers.trainer_utils import get_last_checkpoint
@@ -45,6 +50,7 @@ except Exception:
     # Newer versions may move or remove TPU utility in non-TPU setups.
     def is_torch_tpu_available():
         return False
+
 
 os.environ["WANDB_DISABLED"] = "true"
 
@@ -104,7 +110,9 @@ class DataTrainingArguments:
     )
     mask_prefix_before_ppt: bool = field(
         default=True,
-        metadata={"help": "Mask labels before (and including) PPT marker so loss focuses on decision suffix."},
+        metadata={
+            "help": "Mask labels before (and including) PPT marker so loss focuses on decision suffix."
+        },
     )
     mask_in_collator: bool = field(
         default=True,
@@ -127,29 +135,27 @@ class DataTrainingArguments:
         default=16,
         metadata={"help": "Minimum number of supervised (non -100) suffix tokens kept per sample."},
     )
+    allow_legacy_dataset: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "Explicitly allow old Arrow datasets without sequence integrity metadata, "
+                "only for reproducing old runs. Rebuild raw JSON for complete-schedule training."
+            )
+        },
+    )
     fix_mistral_regex: bool = field(
         default=True,
         metadata={"help": "Try enabling fix_mistral_regex when tokenizer supports it."},
     )
 
 
-def _build_ppt_marker_id_candidates(tokenizer, marker: str) -> List[List[int]]:
-    candidates = []
-    for text in (marker, f" {marker}", f"{marker} "):
-        ids = tokenizer(text, add_special_tokens=False)["input_ids"]
-        if ids and ids not in candidates:
-            candidates.append(ids)
-    candidates.sort(key=len, reverse=True)
-    return candidates
+_build_ppt_marker_id_candidates = build_ppt_marker_id_candidates
 
 
 def _find_subseq_end(input_ids: List[int], patterns: List[List[int]]) -> Optional[int]:
-    for i in range(len(input_ids)):
-        for pat in patterns:
-            end = i + len(pat)
-            if end <= len(input_ids) and input_ids[i:end] == pat:
-                return end - 1
-    return None
+    marker_end = find_ppt_marker_end(input_ids, patterns)
+    return marker_end if marker_end >= 0 else None
 
 
 class PPTSuffixDataCollator:
@@ -168,6 +174,8 @@ class PPTSuffixDataCollator:
             feature.pop("length", None)
             feature.pop("keep_sample", None)
             feature.pop("suffix_tokens", None)
+            for name in CLM_INTEGRITY_COLUMNS:
+                feature.pop(name, None)
 
             labels = feature.get("labels")
             if hasattr(labels, "tolist"):
@@ -241,7 +249,9 @@ def _maybe_shuffle_and_select(dataset, split_name, max_samples, seed):
     return dataset
 
 
-def _apply_ppt_suffix_mask(dataset, split_name, marker_patterns, drop_without_ppt, min_suffix_tokens):
+def _apply_ppt_suffix_mask(
+    dataset, split_name, marker_patterns, drop_without_ppt, min_suffix_tokens
+):
     before = len(dataset)
     has_precomputed = "ppt_end" in dataset.column_names
     if has_precomputed:
@@ -315,7 +325,9 @@ def _apply_ppt_suffix_mask(dataset, split_name, marker_patterns, drop_without_pp
 def main():
     parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
-        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+        model_args, data_args, training_args = parser.parse_json_file(
+            json_file=os.path.abspath(sys.argv[1])
+        )
     else:
         # Backward-compatible alias for older CLI usage.
         cli_args = []
@@ -351,7 +363,11 @@ def main():
     logger.info(f"Training/evaluation parameters: {training_args}")
 
     last_checkpoint = None
-    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
+    if (
+        os.path.isdir(training_args.output_dir)
+        and training_args.do_train
+        and not training_args.overwrite_output_dir
+    ):
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
         if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 0:
             raise ValueError(
@@ -370,13 +386,38 @@ def main():
         active_splits.append("train")
     if training_args.do_eval:
         active_splits.append("validation")
+    for split_name in active_splits:
+        if split_name not in tokenized_datasets:
+            raise ValueError(f"Required dataset split is missing: {split_name}")
+        validate_clm_dataset_integrity(
+            tokenized_datasets[split_name],
+            split_name,
+            allow_legacy=data_args.allow_legacy_dataset,
+        )
+        # An explicitly allowed legacy Arrow may contain a stale ppt_end from
+        # the old whitespace-inclusive protocol.  Force canonical runtime
+        # matching instead of silently trusting that boundary.
+        if (
+            "ppt_boundary_version" not in tokenized_datasets[split_name].column_names
+            and "ppt_end" in tokenized_datasets[split_name].column_names
+        ):
+            tokenized_datasets[split_name] = tokenized_datasets[split_name].remove_columns(
+                "ppt_end"
+            )
+        metadata_columns = [
+            name
+            for name in CLM_INTEGRITY_COLUMNS
+            if name in tokenized_datasets[split_name].column_names
+        ]
+        tokenized_datasets[split_name] = tokenized_datasets[split_name].remove_columns(
+            metadata_columns
+        )
     use_precomputed_ppt_collator = (
         data_args.mask_prefix_before_ppt
         and data_args.mask_in_collator
         and bool(active_splits)
         and all(
-            split in tokenized_datasets
-            and "ppt_end" in tokenized_datasets[split].column_names
+            split in tokenized_datasets and "ppt_end" in tokenized_datasets[split].column_names
             for split in active_splits
         )
     )
@@ -402,7 +443,9 @@ def main():
     if data_args.mask_prefix_before_ppt:
         marker_patterns = _build_ppt_marker_id_candidates(tokenizer, data_args.ppt_marker)
         if not marker_patterns:
-            raise ValueError(f"Cannot tokenize ppt_marker={data_args.ppt_marker!r} into non-empty ids")
+            raise ValueError(
+                f"Cannot tokenize ppt_marker={data_args.ppt_marker!r} into non-empty ids"
+            )
         logger.info("Using PPT marker id patterns: %s", marker_patterns)
 
     config = AutoConfig.from_pretrained(
@@ -476,7 +519,9 @@ def main():
                     min_suffix_tokens=data_args.min_suffix_tokens,
                 )
         if data_args.max_train_samples is not None:
-            train_dataset = train_dataset.select(range(min(len(train_dataset), data_args.max_train_samples)))
+            train_dataset = train_dataset.select(
+                range(min(len(train_dataset), data_args.max_train_samples))
+            )
         train_dataset = _strip_unused_length_column(train_dataset)
         logger.info(f"Loaded train split with {len(train_dataset)} samples")
     else:
@@ -489,7 +534,9 @@ def main():
         required_columns = {"input_ids", "attention_mask", "labels"}
         missing_columns = required_columns - set(eval_dataset.column_names)
         if missing_columns:
-            raise ValueError(f"Validation split is missing required columns: {sorted(missing_columns)}")
+            raise ValueError(
+                f"Validation split is missing required columns: {sorted(missing_columns)}"
+            )
         if data_args.max_eval_samples is not None and data_args.subsample_before_mask:
             eval_dataset = _maybe_shuffle_and_select(
                 eval_dataset,
@@ -507,7 +554,9 @@ def main():
                     min_suffix_tokens=data_args.min_suffix_tokens,
                 )
         if data_args.max_eval_samples is not None:
-            eval_dataset = eval_dataset.select(range(min(len(eval_dataset), data_args.max_eval_samples)))
+            eval_dataset = eval_dataset.select(
+                range(min(len(eval_dataset), data_args.max_eval_samples))
+            )
         eval_dataset = _strip_unused_length_column(eval_dataset)
         logger.info(f"Loaded validation split with {len(eval_dataset)} samples")
 
@@ -559,25 +608,45 @@ def main():
     # training path independent of TVM startup cost.
     struct_sketch = os.environ.get("STRUCT_EVAL_SKETCH_PATH")
     struct_target = os.environ.get("STRUCT_EVAL_TARGET")
+    struct_metric = (
+        (training_args.metric_for_best_model or "").removeprefix("eval_").startswith("struct_")
+    )
+    if struct_metric and not (training_args.do_eval and struct_sketch and struct_target):
+        raise ValueError(
+            "Structural model selection requires STRUCT_EVAL_SKETCH_PATH and STRUCT_EVAL_TARGET"
+        )
     if training_args.do_eval and struct_sketch and struct_target:
+        struct_build = os.environ.get("STRUCT_EVAL_DO_BUILD", "0").lower() in {"1", "true", "yes"}
+        if struct_metric and not struct_build:
+            raise ValueError("Structural model selection requires STRUCT_EVAL_DO_BUILD=1")
         try:
-            from eval_struct import StructuralEvalCallback  # noqa: WPS433
+            from LLM.validation.eval_struct import StructuralEvalCallback
+
             callbacks.append(
                 StructuralEvalCallback(
                     sketch_path=struct_sketch,
                     target=struct_target,
                     max_workloads=int(os.environ.get("STRUCT_EVAL_MAX_WORKLOADS", "32")),
                     max_states_per_workload=int(os.environ.get("STRUCT_EVAL_MAX_STATES", "2")),
-                    max_new_tokens=int(os.environ.get("STRUCT_EVAL_MAX_NEW_TOKENS", "512")),
+                    max_new_tokens=(
+                        int(os.environ["STRUCT_EVAL_MAX_NEW_TOKENS"])
+                        if os.environ.get("STRUCT_EVAL_MAX_NEW_TOKENS")
+                        else None
+                    ),
                     batch_size=int(os.environ.get("STRUCT_EVAL_BATCH_SIZE", "8")),
-                    do_build=os.environ.get("STRUCT_EVAL_DO_BUILD", "0").lower() in {"1", "true", "yes"},
-                    do_sample=os.environ.get("STRUCT_EVAL_DO_SAMPLE", "0").lower() in {"1", "true", "yes"},
+                    do_build=struct_build,
+                    do_sample=os.environ.get("STRUCT_EVAL_DO_SAMPLE", "0").lower()
+                    in {"1", "true", "yes"},
                     seed=int(os.environ.get("STRUCT_EVAL_SEED", "42")),
+                    required_candidates=int(os.environ.get("STRUCT_EVAL_REQUIRED_CANDIDATES", "1")),
+                    constraint_mode=os.environ.get("STRUCT_EVAL_CONSTRAINT_MODE", "none"),
                 )
             )
-            logger.info("StructuralEvalCallback enabled: sketch=%s target=%s", struct_sketch, struct_target)
+            logger.info(
+                "StructuralEvalCallback enabled: sketch=%s target=%s", struct_sketch, struct_target
+            )
         except Exception as exc:  # pragma: no cover - defensive
-            logger.warning("Failed to register StructuralEvalCallback: %s", exc)
+            raise RuntimeError("Failed to register StructuralEvalCallback") from exc
 
     trainer = Trainer(
         model=model,
@@ -586,10 +655,14 @@ def main():
         eval_dataset=eval_dataset,
         tokenizer=tokenizer,
         data_collator=data_collator,
-        compute_metrics=compute_metrics if training_args.do_eval and not is_torch_tpu_available() else None,
-        preprocess_logits_for_metrics=preprocess_logits_for_metrics
-        if training_args.do_eval and not is_torch_tpu_available()
-        else None,
+        compute_metrics=(
+            compute_metrics if training_args.do_eval and not is_torch_tpu_available() else None
+        ),
+        preprocess_logits_for_metrics=(
+            preprocess_logits_for_metrics
+            if training_args.do_eval and not is_torch_tpu_available()
+            else None
+        ),
         callbacks=callbacks or None,
     )
 

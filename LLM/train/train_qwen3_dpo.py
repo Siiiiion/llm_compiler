@@ -56,6 +56,11 @@ from transformers import (
 )
 from transformers.trainer_utils import get_last_checkpoint
 
+REPOSITORY_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if REPOSITORY_ROOT not in sys.path:
+    sys.path.insert(0, REPOSITORY_ROOT)
+from LLM.core.tokenization_protocol import PPT_BOUNDARY_VERSION, encode_prompt_suffix
+
 os.environ["WANDB_DISABLED"] = "true"
 
 logger = logging.getLogger(__name__)
@@ -117,9 +122,7 @@ class DPODataArguments:
 class DPOTrainingExtraArguments:
     training_mode: str = field(
         default="dpo",
-        metadata={
-            "help": f"训练模式：{TRAINING_MODES}；sft 表示只在 chosen 上做 CLM"
-        },
+        metadata={"help": f"训练模式：{TRAINING_MODES}；sft 表示只在 chosen 上做 CLM"},
     )
     beta: float = field(default=0.1, metadata={"help": "DPO 温度系数 β"})
     label_smoothing: float = field(default=0.0, metadata={"help": "IPO-like 标签平滑"})
@@ -133,7 +136,7 @@ class DPOTrainingExtraArguments:
     )
     lapo_normalize: bool = field(
         default=True,
-        metadata={"help": "LAPO 模式下将 batch 内权重归一化到均值 1，稳定学习率"},
+        metadata={"help": "LAPO 按过滤、抽样后的训练集裁剪权重均值归一化；不依赖 batch 大小"},
     )
     log_reward_margin: bool = field(default=True)
 
@@ -152,34 +155,38 @@ def _tokenize_pair(
 ) -> Dict[str, Any]:
     """将单个偏好对样本编码成 (chosen_input_ids, rejected_input_ids) 等字段。"""
 
-    prompt_ids = tokenizer(example["prompt"], add_special_tokens=False)["input_ids"]
-    chosen_ids = tokenizer(example["chosen"], add_special_tokens=False)["input_ids"]
-    rejected_ids = tokenizer(example["rejected"], add_special_tokens=False)["input_ids"]
+    try:
+        prompt_ids, chosen_input_ids, chosen_labels = encode_prompt_suffix(
+            tokenizer,
+            example["prompt"],
+            example["chosen"],
+            append_eos=append_eos,
+        )
+        rejected_prompt_ids, rejected_input_ids, rejected_labels = encode_prompt_suffix(
+            tokenizer,
+            example["prompt"],
+            example["rejected"],
+            append_eos=append_eos,
+        )
+    except (KeyError, TypeError, ValueError):
+        # A tokenizer that cannot preserve the prompt prefix must not produce a
+        # partially aligned preference pair.
+        prompt_ids = []
+        chosen_input_ids, chosen_labels = [], []
+        rejected_input_ids, rejected_labels = [], []
 
-    if append_eos and tokenizer.eos_token_id is not None:
-        eos = tokenizer.eos_token_id
-        if not chosen_ids or chosen_ids[-1] != eos:
-            chosen_ids = list(chosen_ids) + [eos]
-        if not rejected_ids or rejected_ids[-1] != eos:
-            rejected_ids = list(rejected_ids) + [eos]
-
+    # Do not left-truncate prompts or right-truncate decisions: either operation
+    # changes the condition/suffix boundary and teaches a sequence that cannot
+    # be reproduced by generation.  Whole pairs are filtered instead.
+    if rejected_input_ids and rejected_prompt_ids != prompt_ids:
+        chosen_input_ids, chosen_labels = [], []
+        rejected_input_ids, rejected_labels = [], []
     if len(prompt_ids) > max_prompt_length:
-        # 从左侧截断 prompt：保留靠近 PPT 的末尾，因为那是决策上下文的关键
-        prompt_ids = prompt_ids[-max_prompt_length:]
-
-    def _assemble(suffix_ids: List[int]) -> Tuple[List[int], List[int]]:
-        if len(prompt_ids) + len(suffix_ids) > max_length:
-            keep = max_length - len(prompt_ids)
-            if keep <= 0:
-                # prompt 已经占满；放弃该样本（调用方需处理）
-                return [], []
-            suffix_ids = suffix_ids[:keep]
-        input_ids = list(prompt_ids) + list(suffix_ids)
-        labels = [-100] * len(prompt_ids) + list(suffix_ids)
-        return input_ids, labels
-
-    chosen_input_ids, chosen_labels = _assemble(chosen_ids)
-    rejected_input_ids, rejected_labels = _assemble(rejected_ids)
+        chosen_input_ids, chosen_labels = [], []
+        rejected_input_ids, rejected_labels = [], []
+    if len(chosen_input_ids) > max_length or len(rejected_input_ids) > max_length:
+        chosen_input_ids, chosen_labels = [], []
+        rejected_input_ids, rejected_labels = [], []
 
     if not chosen_input_ids or not rejected_input_ids:
         return {
@@ -224,9 +231,7 @@ def _load_preference_dataset(
     tokenizer,
 ) -> Tuple[Any, Optional[Any]]:
     train_path = os.path.join(data_args.preference_dataset, data_args.train_file_name)
-    validation_path = os.path.join(
-        data_args.preference_dataset, data_args.validation_file_name
-    )
+    validation_path = os.path.join(data_args.preference_dataset, data_args.validation_file_name)
     if not os.path.isfile(train_path):
         raise FileNotFoundError(f"Train preference JSONL not found: {train_path}")
 
@@ -248,7 +253,17 @@ def _load_preference_dataset(
         )
 
     tokenized = raw.map(_map_fn, remove_columns=columns, desc="Tokenizing preference pairs")
+    before_filter = {split: len(dataset) for split, dataset in tokenized.items()}
     tokenized = tokenized.filter(lambda x: x["valid"] == 1)
+    for split, dataset in tokenized.items():
+        logger.info(
+            "Preference boundary protocol filtered split=%s before=%d after=%d dropped=%d; "
+            "pairs are never partially truncated",
+            split,
+            before_filter[split],
+            len(dataset),
+            before_filter[split] - len(dataset),
+        )
     tokenized = tokenized.remove_columns(["valid"])
 
     train_dataset = tokenized["train"]
@@ -273,9 +288,11 @@ class DPOCollator:
     def _pad(self, seqs: List[List[int]], pad_val: int) -> torch.Tensor:
         max_len = max(len(s) for s in seqs)
         if self.pad_to_multiple_of > 1:
-            max_len = ((max_len + self.pad_to_multiple_of - 1)
-                       // self.pad_to_multiple_of
-                       * self.pad_to_multiple_of)
+            max_len = (
+                (max_len + self.pad_to_multiple_of - 1)
+                // self.pad_to_multiple_of
+                * self.pad_to_multiple_of
+            )
         out = torch.full((len(seqs), max_len), pad_val, dtype=torch.long)
         for i, s in enumerate(seqs):
             if len(s) > 0:
@@ -333,6 +350,29 @@ class DPOCollator:
 # ---------------------------------------------------------------------------
 
 
+def _lapo_weight_statistics(train_dataset, weight_clip: float) -> Dict[str, Any]:
+    """Compute a fixed scale from retained training pairs, never from validation."""
+    if not math.isfinite(weight_clip) or weight_clip < 0:
+        raise ValueError("lapo_weight_clip must be finite and >= 0 (0 disables clipping)")
+    if train_dataset is None or len(train_dataset) == 0:
+        raise ValueError("LAPO requires nonempty retained training pairs for weight statistics")
+    weights = np.asarray(train_dataset["latency_weight"], dtype=np.float64)
+    if not np.isfinite(weights).all() or (weights < 0).any():
+        raise ValueError("Training latency_weight values must be finite and nonnegative")
+    clipped = np.minimum(weights, weight_clip) if weight_clip > 0 else weights
+    return {
+        "source": "retained_train_pairs",
+        "num_samples": len(weights),
+        "dataset_fingerprint": getattr(train_dataset, "_fingerprint", None),
+        "weight_clip": weight_clip,
+        "raw_mean": float(weights.mean()),
+        "clipped_mean": float(clipped.mean()),
+        "clipped_min": float(clipped.min()),
+        "clipped_max": float(clipped.max()),
+        "num_clipped": int((weights != clipped).sum()),
+    }
+
+
 def _compute_sequence_logps(
     logits: torch.Tensor, labels: torch.Tensor, label_pad_id: int = -100
 ) -> torch.Tensor:
@@ -340,7 +380,7 @@ def _compute_sequence_logps(
     # logits: (B, T, V); labels: (B, T)
     shifted_logits = logits[:, :-1, :]
     shifted_labels = labels[:, 1:].clone()
-    mask = (shifted_labels != label_pad_id)
+    mask = shifted_labels != label_pad_id
     safe_labels = shifted_labels.masked_fill(~mask, 0)
     log_probs = F.log_softmax(shifted_logits.float(), dim=-1)
     per_token = torch.gather(log_probs, dim=2, index=safe_labels.unsqueeze(-1)).squeeze(-1)
@@ -391,6 +431,7 @@ class DPOTrainer(Trainer):
         label_smoothing: float = 0.0,
         lapo_weight_clip: float = 10.0,
         lapo_normalize: bool = True,
+        lapo_weight_stats: Optional[Dict[str, Any]] = None,
         log_reward_margin: bool = True,
         **kwargs,
     ):
@@ -403,7 +444,31 @@ class DPOTrainer(Trainer):
         self.lapo_weight_clip = lapo_weight_clip
         self.lapo_normalize = lapo_normalize
         self.log_reward_margin = log_reward_margin
-        self._last_metrics: Dict[str, float] = {}
+        # Our objective is already a per-pair mean and does not consume Trainer's
+        # token-count kwargs. Let Trainer apply gradient-accumulation scaling.
+        self.model_accepts_loss_kwargs = False
+        self.lapo_weight_stats = None
+        self.lapo_weight_mean = 1.0
+        if training_mode == "lapo":
+            self.lapo_weight_stats = (
+                lapo_weight_stats
+                if lapo_weight_stats is not None
+                else _lapo_weight_statistics(self.train_dataset, lapo_weight_clip)
+            )
+            if lapo_normalize:
+                self.lapo_weight_mean = self.lapo_weight_stats["clipped_mean"]
+                if not math.isfinite(self.lapo_weight_mean) or self.lapo_weight_mean <= 0:
+                    raise ValueError("LAPO normalization requires a positive training weight mean")
+            logger.info(
+                "LAPO fixed training weight statistics=%s; normalization_divisor=%s",
+                self.lapo_weight_stats,
+                self.lapo_weight_mean,
+            )
+        self._train_metric_totals = None
+        self._eval_metric_totals = None
+        self._collect_eval_metrics = False
+        self._train_metric_names = ()
+        self._eval_metric_names = ()
 
         if self.ref_model is not None:
             self.ref_model.eval()
@@ -429,7 +494,9 @@ class DPOTrainer(Trainer):
 
     # -------- forward helpers --------
 
-    def _forward_logps(self, model: torch.nn.Module, batch: Dict[str, torch.Tensor], key: str) -> torch.Tensor:
+    def _forward_logps(
+        self, model: torch.nn.Module, batch: Dict[str, torch.Tensor], key: str
+    ) -> torch.Tensor:
         input_ids = batch[f"{key}_input_ids"]
         attention_mask = batch[f"{key}_attention_mask"]
         labels = batch[f"{key}_labels"]
@@ -452,9 +519,10 @@ class DPOTrainer(Trainer):
                 use_cache=False,
             )
             loss = outputs.loss
-            self._last_metrics = {
-                "loss/sft": float(loss.detach().cpu().item()),
-            }
+            if model.training:
+                self._record_metrics(
+                    {"loss/sft": loss.detach().expand(len(inputs["chosen_labels"]))}
+                )
             return (loss, outputs) if return_outputs else loss
 
         if mode not in ("dpo", "lapo"):
@@ -482,46 +550,122 @@ class DPOTrainer(Trainer):
 
         if mode == "lapo":
             w = inputs["latency_weight"].to(per_sample_loss.dtype).to(per_sample_loss.device)
+            if not torch.isfinite(w).all() or (w < 0).any():
+                raise ValueError("latency_weight values must be finite and nonnegative")
             if self.lapo_weight_clip and self.lapo_weight_clip > 0:
                 w = w.clamp(min=0.0, max=float(self.lapo_weight_clip))
             if self.lapo_normalize:
-                w_mean = w.mean().clamp(min=1e-6)
-                w = w / w_mean
-            loss = (per_sample_loss * w).mean()
+                w = w / self.lapo_weight_mean
+            weighted_loss = per_sample_loss * w
         else:
-            loss = per_sample_loss.mean()
+            weighted_loss = per_sample_loss
+        loss = weighted_loss.mean()
 
         metrics = {
-            "loss/dpo": float(loss.detach().cpu().item()),
-            "reward/chosen_mean": float(chosen_rewards.mean().cpu().item()),
-            "reward/rejected_mean": float(rejected_rewards.mean().cpu().item()),
-            "reward/accuracy": float((chosen_rewards > rejected_rewards).float().mean().cpu().item()),
+            "loss/dpo": weighted_loss.detach(),
+            "reward/chosen_mean": chosen_rewards,
+            "reward/rejected_mean": rejected_rewards,
+            "reward/accuracy": (chosen_rewards > rejected_rewards).float(),
         }
         if self.log_reward_margin:
-            metrics["reward/margin_mean"] = float(
-                (chosen_rewards - rejected_rewards).mean().cpu().item()
-            )
-        self._last_metrics = metrics
+            metrics["reward/margin_mean"] = chosen_rewards - rejected_rewards
+        if mode == "lapo":
+            metrics["lapo/weight_mean"] = w.detach()
+            metrics["loss/dpo_unweighted"] = per_sample_loss.detach()
+        if model.training:
+            self._record_metrics(metrics)
 
-        return (loss, None) if return_outputs else loss
+        return (loss, metrics) if return_outputs else loss
 
-    # Attach detailed metrics onto Trainer log stream.
+    def _record_metrics(self, metrics, evaluation=False):
+        """Keep sums and counts, rather than the last batch or a mean of means."""
+        names = tuple(metrics)
+        values = torch.stack([metrics[name].detach().double() for name in names], dim=1)
+        if evaluation:
+            # Gather before summing: Accelerate removes duplicate padding rows
+            # in the final distributed batch using the dataloader remainder.
+            values = self.accelerator.gather_for_metrics(values)
+        totals = torch.cat((values.sum(dim=0), values.new_tensor([len(values)])))
+        attr = "_eval_metric_totals" if evaluation else "_train_metric_totals"
+        previous = getattr(self, attr)
+        setattr(self, attr, totals if previous is None else previous + totals)
+        setattr(self, "_eval_metric_names" if evaluation else "_train_metric_names", names)
+
     def log(self, logs: Dict[str, float], *args, **kwargs):
-        if self._last_metrics:
-            for k, v in self._last_metrics.items():
-                logs.setdefault(k, v)
-            self._last_metrics = {}
+        if self._train_metric_totals is not None and ("loss" in logs or "train_loss" in logs):
+            totals = self.accelerator.reduce(self._train_metric_totals, reduction="sum")
+            means = (totals[:-1] / totals[-1]).cpu().tolist()
+            logs = dict(logs)
+            logs.update(
+                {f"train_{name}": value for name, value in zip(self._train_metric_names, means)}
+            )
+            self._train_metric_totals = None
         return super().log(logs, *args, **kwargs)
 
-    # Evaluation fallback: reuse compute_loss and accuracy-like margin metric.
+    def _evaluation_with_metrics(self, loop, *args, metric_key_prefix="eval", **kwargs):
+        self._eval_metric_totals = None
+        self._collect_eval_metrics = self.training_mode in ("dpo", "lapo")
+        try:
+            output = loop(*args, metric_key_prefix=metric_key_prefix, **kwargs)
+            if self._eval_metric_totals is not None:
+                totals = self._eval_metric_totals.cpu()
+                means = (totals[:-1] / totals[-1]).tolist()
+                output.metrics.update(
+                    {
+                        f"{metric_key_prefix}_{name}": value
+                        for name, value in zip(self._eval_metric_names, means)
+                    }
+                )
+                # Scalar batch losses repeated by Trainer cannot remove the
+                # contribution of individual distributed padding rows.
+                output.metrics[f"{metric_key_prefix}_loss"] = means[0]
+                output.metrics[f"{metric_key_prefix}_preference_samples"] = int(totals[-1].item())
+            return output
+        finally:
+            self._collect_eval_metrics = False
+            self._eval_metric_totals = None
+
+    def evaluation_loop(
+        self,
+        dataloader,
+        description,
+        prediction_loss_only=None,
+        ignore_keys=None,
+        metric_key_prefix="eval",
+    ):
+        return self._evaluation_with_metrics(
+            super().evaluation_loop,
+            dataloader,
+            description,
+            prediction_loss_only=prediction_loss_only,
+            ignore_keys=ignore_keys,
+            metric_key_prefix=metric_key_prefix,
+        )
+
+    def prediction_loop(
+        self,
+        dataloader,
+        description,
+        prediction_loss_only=None,
+        ignore_keys=None,
+        metric_key_prefix="eval",
+    ):
+        return self._evaluation_with_metrics(
+            super().prediction_loop,
+            dataloader,
+            description,
+            prediction_loss_only=prediction_loss_only,
+            ignore_keys=ignore_keys,
+            metric_key_prefix=metric_key_prefix,
+        )
+
     def prediction_step(self, model, inputs, prediction_loss_only, ignore_keys=None):
         inputs = self._prepare_inputs(inputs)
-        with torch.no_grad():
-            loss = self.compute_loss(model, inputs)
-        loss = loss.detach()
-        if prediction_loss_only:
-            return (loss, None, None)
-        return (loss, None, None)
+        with torch.no_grad(), self.compute_loss_context_manager():
+            loss, metrics = self.compute_loss(model, inputs, return_outputs=True)
+        if self._collect_eval_metrics:
+            self._record_metrics(metrics, evaluation=True)
+        return (loss.detach(), None, None)
 
 
 # ---------------------------------------------------------------------------
@@ -647,6 +791,12 @@ def main():
     if eval_dataset is not None:
         logger.info("eval_dataset size = %d", len(eval_dataset))
 
+    lapo_weight_stats = None
+    if dpo_args.training_mode == "lapo":
+        lapo_weight_stats = _lapo_weight_statistics(train_dataset, dpo_args.lapo_weight_clip)
+        if dpo_args.lapo_normalize and lapo_weight_stats["clipped_mean"] <= 0:
+            raise ValueError("LAPO normalization requires a positive training weight mean")
+
     model = _load_causal_model(model_args, model_args.model_name_or_path)
     if model.config.pad_token_id is None and tokenizer.pad_token_id is not None:
         model.config.pad_token_id = tokenizer.pad_token_id
@@ -681,8 +831,41 @@ def main():
         label_smoothing=dpo_args.label_smoothing,
         lapo_weight_clip=dpo_args.lapo_weight_clip,
         lapo_normalize=dpo_args.lapo_normalize,
+        lapo_weight_stats=lapo_weight_stats,
         log_reward_margin=dpo_args.log_reward_margin,
     )
+
+    if trainer.is_world_process_zero():
+        manifest = {
+            "training_mode": dpo_args.training_mode,
+            "beta": dpo_args.beta,
+            "loss_type": dpo_args.loss_type,
+            "label_smoothing": dpo_args.label_smoothing,
+            "lapo_weight_clip": dpo_args.lapo_weight_clip,
+            "lapo_normalize": dpo_args.lapo_normalize,
+            "lapo_normalization": (
+                "fixed_train_clipped_mean_v1"
+                if dpo_args.training_mode == "lapo" and dpo_args.lapo_normalize
+                else "none"
+            ),
+            "lapo_weight_stats": trainer.lapo_weight_stats,
+            "lapo_normalization_divisor": trainer.lapo_weight_mean,
+            "ppt_boundary_version": PPT_BOUNDARY_VERSION,
+            "tokenizer_name": tokenizer_path,
+            "append_eos_to_suffix": data_args.append_eos_to_suffix,
+            "sample_seed": data_args.sample_seed,
+            "max_train_samples": data_args.max_train_samples,
+            "preference_dataset": data_args.preference_dataset,
+            "train_file_name": data_args.train_file_name,
+            "max_prompt_length": data_args.max_prompt_length,
+            "max_length": data_args.max_length,
+            "model_name_or_path": model_args.model_name_or_path,
+            "ref_model_name_or_path": model_args.ref_model_name_or_path
+            or model_args.model_name_or_path,
+        }
+        os.makedirs(training_args.output_dir, exist_ok=True)
+        with open(os.path.join(training_args.output_dir, "dpo_manifest.json"), "w") as f:
+            json.dump(manifest, f, indent=2)
 
     if training_args.do_train:
         checkpoint = training_args.resume_from_checkpoint or last_checkpoint
@@ -695,31 +878,16 @@ def main():
         trainer.save_metrics("train", metrics)
         trainer.save_state()
 
-        manifest = {
-            "training_mode": dpo_args.training_mode,
-            "beta": dpo_args.beta,
-            "loss_type": dpo_args.loss_type,
-            "label_smoothing": dpo_args.label_smoothing,
-            "lapo_weight_clip": dpo_args.lapo_weight_clip,
-            "lapo_normalize": dpo_args.lapo_normalize,
-            "preference_dataset": data_args.preference_dataset,
-            "max_prompt_length": data_args.max_prompt_length,
-            "max_length": data_args.max_length,
-            "model_name_or_path": model_args.model_name_or_path,
-            "ref_model_name_or_path": model_args.ref_model_name_or_path or model_args.model_name_or_path,
-        }
-        with open(os.path.join(training_args.output_dir, "dpo_manifest.json"), "w") as f:
-            json.dump(manifest, f, indent=2)
-
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
         metrics = trainer.evaluate()
         if eval_dataset is not None:
             metrics["eval_samples"] = len(eval_dataset)
-        try:
-            metrics["perplexity"] = math.exp(metrics["eval_loss"])
-        except (OverflowError, KeyError):
-            metrics["perplexity"] = float("inf")
+        if dpo_args.training_mode == "sft":
+            try:
+                metrics["perplexity"] = math.exp(metrics["eval_loss"])
+            except (OverflowError, KeyError):
+                metrics["perplexity"] = float("inf")
         trainer.log_metrics("eval", metrics)
         trainer.save_metrics("eval", metrics)
 

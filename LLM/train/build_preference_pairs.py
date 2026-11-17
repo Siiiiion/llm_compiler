@@ -25,7 +25,6 @@ import logging
 import math
 import os
 import random
-import shutil
 import sys
 import time
 from dataclasses import dataclass, field
@@ -33,10 +32,9 @@ from multiprocessing import Pool
 from typing import Dict, List, Optional, Tuple
 
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-LLM_DIR = os.path.dirname(SCRIPT_DIR)
-if LLM_DIR not in sys.path:
-    sys.path.insert(0, LLM_DIR)
+REPOSITORY_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if REPOSITORY_ROOT not in sys.path:
+    sys.path.insert(0, REPOSITORY_ROOT)
 
 from transformers import HfArgumentParser, set_seed
 
@@ -44,12 +42,8 @@ import tvm
 from tvm import auto_scheduler
 from tvm.auto_scheduler.measure_record import load_record_from_string
 
-from common import (
-    get_hold_out_five_files,
-    load_and_register_tasks,
-    register_data_path,
-)
-from make_dataset_utils import json_dfs_without_bracket
+from LLM.core.common import get_hold_out_five_files, load_and_register_tasks, register_data_path
+from LLM.data.make_dataset_utils import json_dfs_without_bracket
 
 
 WEIGHT_STRATEGIES = ("uniform", "log_gap", "linear_gap", "clipped_linear")
@@ -94,7 +88,8 @@ class PreferenceArgs:
     split_seed: int = field(default=0, metadata={"help": "文件级划分随机种子"})
     sample_seed: int = field(default=42, metadata={"help": "rejected 抽样随机种子"})
     file_cnt: Optional[int] = field(
-        default=None, metadata={"help": "仅采样 N 个 workload 文件（调试用）"},
+        default=None,
+        metadata={"help": "仅采样 N 个 workload 文件（调试用）"},
     )
     weight_strategy: str = field(
         default="log_gap",
@@ -149,7 +144,12 @@ def _dfs_flatten(data) -> str:
 
 
 def _compute_weight(strategy: str, lat_chosen: float, lat_rejected: float, clip: float) -> float:
-    if lat_chosen <= 0 or lat_rejected <= 0 or not math.isfinite(lat_chosen) or not math.isfinite(lat_rejected):
+    if (
+        lat_chosen <= 0
+        or lat_rejected <= 0
+        or not math.isfinite(lat_chosen)
+        or not math.isfinite(lat_rejected)
+    ):
         return 1.0
     ratio = lat_rejected / lat_chosen
     if strategy == "uniform":
@@ -181,13 +181,9 @@ def _normalize_record(json_line: dict) -> Tuple[dict, Optional[int]]:
 
 
 def _get_latency(json_line: dict) -> Optional[float]:
-    latencies = json_line["r"][0]
-    if not latencies:
-        return None
-    valid = [l for l in latencies if l and l > 0 and l < 1e9]
-    if not valid:
-        return None
-    return sum(valid) / len(valid)
+    from LLM.core.schedule_record_utils import measured_latency
+
+    return measured_latency(json_line)
 
 
 def _process_file(args) -> Tuple[List[dict], Dict[str, int]]:
@@ -305,7 +301,9 @@ def _process_file(args) -> Tuple[List[dict], Dict[str, int]]:
         rng.shuffle(candidates)
         for rejected in candidates[:max_pairs_per_group]:
             gap = rejected["latency"] / max(chosen["latency"], 1e-12)
-            weight = _compute_weight(weight_strategy, chosen["latency"], rejected["latency"], weight_clip)
+            weight = _compute_weight(
+                weight_strategy, chosen["latency"], rejected["latency"], weight_clip
+            )
             results.append(
                 {
                     "source_file": os.path.basename(file),
@@ -330,7 +328,9 @@ def _process_file(args) -> Tuple[List[dict], Dict[str, int]]:
     return results, stats
 
 
-def _split_files_for_validation(files: List[str], valid_percentage: int, seed: int) -> Tuple[List[str], List[str]]:
+def _split_files_for_validation(
+    files: List[str], valid_percentage: int, seed: int
+) -> Tuple[List[str], List[str]]:
     files = list(files)
     if not files:
         return [], []
@@ -386,7 +386,9 @@ def _run_group(
     num_workers = min(num_workers, len(worker_args))
 
     start = time.time()
-    logger.info("%s: start processing %d files with %d workers", group_name, len(files), num_workers)
+    logger.info(
+        "%s: start processing %d files with %d workers", group_name, len(files), num_workers
+    )
 
     if num_workers == 1:
         per_file_results = [_process_file(a) for a in worker_args]
@@ -408,7 +410,9 @@ def _run_group(
     merged["pairs_written"] = total_pairs
     merged["files_processed"] = len(files)
     merged["elapsed_seconds"] = round(time.time() - start, 2)
-    logger.info("%s: wrote %d pairs to %s (stats=%s)", group_name, total_pairs, output_jsonl, merged)
+    logger.info(
+        "%s: wrote %d pairs to %s (stats=%s)", group_name, total_pairs, output_jsonl, merged
+    )
     return merged
 
 

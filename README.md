@@ -15,10 +15,10 @@ ResNet、BERT 或另一个 Qwen3 ONNX 是**被编译的网络**。训练调度�
 | `src/`、`include/`、`python/tvm/` | TVM 编译器、运行时和 Python 接口 |
 | `gen/dump_network_info.py` | 导出 Relay、提取 workload、建立任务注册表 |
 | `gen/dump_programs.py` | 采样初始调度，并通过 LocalBuilder 检查 |
-| `LLM/make_dataset.py`、`LLM/extend_tokenizer.py` | 制作训练数据、prompt，扩充调度词表 |
+| `LLM/data/make_dataset.py`、`LLM/data/extend_tokenizer.py` | 制作训练数据、prompt，扩充调度词表 |
 | `LLM/train/` | Qwen3 继续预训练、SFT、DPO/LAPO |
-| `LLM/gen_state.py`、`LLM/measure_programs.py` | 生成调度、测量 GPU 延迟 |
-| `LLM/benchmark_relay.py`、`LLM/benchmark_relay_batch.py` | 单网络 / 按网络汇总的端到端评测 |
+| `LLM/generation/gen_state.py`、`LLM/benchmark/measure_programs.py` | 生成调度、测量 GPU 延迟 |
+| `LLM/benchmark/benchmark_relay.py`、`LLM/benchmark/benchmark_relay_batch.py` | 单网络 / 按网络汇总的端到端评测 |
 | `LLM/export_onnx/`、`LLM/attention/` | 固定形状 ONNX 导出、独立 attention 实验 |
 | `tests/`、`docs/`、`gallery/`、`plan/` | 测试、文档、教程、设计记录 |
 
@@ -118,7 +118,7 @@ set -o pipefail
 `run01` 是本轮实验目录；新实验改为 `run02` 等新目录。后面的数据制作会重建指定输出目录，
 不要把 `--save_path` 指向原始数据、注册表或模型目录。`pipefail` 让带 `tee` 的命令在主程序失败时仍返回失败状态。
 
-硬件变化时必须同时修改 target、数据和输出目录。当前 `LLM/common.py` 的路径路由识别
+硬件变化时必须同时修改 target、数据和输出目录。当前 `LLM/core/common.py` 的路径路由识别
 `i7 / v100 / a100 / 2080 / 4090`；不能仅把 target 改成不带型号的 `cuda`。
 其他硬件的接入需要先检查该路由和 `src/target/tag.cc`。
 
@@ -276,7 +276,7 @@ PY
 
 ```bash
 cd "$LLMC_REPO/LLM"
-python extend_tokenizer.py \
+python __main__.py extend-tokenizer \
   --base_model "$LLMC_BASE" \
   --output_dir "$LLMC_EXT" \
   --promote_marker PPT \
@@ -354,7 +354,7 @@ conda run --no-capture-output -n llm_compiler_collect \
 `--skip-relay-artifact` 省略包含模型权重的庞大 Relay 文件，仍保存训练需要的任务注册表。
 后续对指定网络评测时再补出其 Relay 文件。
 
-当前 `make_dataset.py --for_type for_gen` 会读取 `LLM/common.py` 中全部内置 hold-out 映射，
+当前 `make_dataset.py --for_type for_gen` 会读取 `LLM/core/common.py` 中全部内置 hold-out 映射，
 且该模式下 `--skip_hold_out` 不生效。因此 Stage1 不能直接使用第 4.1 节的小注册表，
 也不能直接换成仅含 Qwen3 的注册表。
 
@@ -389,7 +389,7 @@ jq '.summary' "$LLMC_WORK/reports/dump_full.json"
 
 ```bash
 cd "$LLMC_REPO/LLM"
-python make_dataset.py \
+python __main__.py dataset \
   --for_type for_gen \
   --target "$LLMC_TARGET" \
   --network_info_dir "$LLMC_NET" \
@@ -439,7 +439,7 @@ jq '.' "$LLMC_DATASET/for_gen_stats.json"
 ```bash
 cd "$LLMC_REPO/LLM"
 CUDA_VISIBLE_DEVICES="${LLMC_TRAIN_GPUS%%,*}" \
-python train/train_qwen3_clm.py \
+python __main__.py train-clm \
   --model_name_or_path "$LLMC_EXT" \
   --tokenizer_name "$LLMC_EXT" \
   --dataset_name "$LLMC_DATASET" \
@@ -548,7 +548,7 @@ python gen/dump_programs.py \
 
 ```bash
 cd "$LLMC_REPO/LLM"
-python make_dataset.py \
+python __main__.py dataset \
   --for_type for_gen_eval_sketch \
   --target "$LLMC_TARGET" \
   --network_info_dir "$LLMC_EVAL_NET" \
@@ -564,14 +564,14 @@ wc -l "$LLMC_EVAL_RUN/prompts/0_merge.json"
 ```
 
 此处 `keep_cnt` 是每个 workload 采样的 **prompt 数**，允许重复抽样，
-不是不同 sketch 的数量保证。可选网络名由 `LLM/common.py` 的 `hold_out_task_files` 定义；
+不是不同 sketch 的数量保证。可选网络名由 `LLM/core/common.py` 的 `hold_out_task_files` 定义；
 例如 `bert_base` 对应其固定映射形状，不会自动覆盖所有 BERT 变体。
 
 ### 6.3 生成并检查调度
 
 ```bash
 CUDA_VISIBLE_DEVICES="$LLMC_TRAIN_GPUS" \
-python gen_state.py \
+python __main__.py generate \
   --target "$LLMC_TARGET" \
   --network_info_dir "$LLMC_EVAL_NET" \
   --model_name_or_path "$LLMC_GENERATOR" \
@@ -615,7 +615,7 @@ wc -l "$LLMC_EVAL_RUN/candidates.json"
 nvidia-smi
 cd "$LLMC_REPO/LLM"
 CUDA_VISIBLE_DEVICES="$LLMC_MEASURE_GPU" \
-python measure_programs.py \
+python __main__.py measure \
   --target "$LLMC_TARGET" \
   --network-info-dir "$LLMC_EVAL_NET" \
   --to-measure-path "$LLMC_EVAL_RUN/candidates.json" \
@@ -659,7 +659,7 @@ test -f "$LLMC_RELAY"
 
 cd "$LLMC_REPO/LLM"
 CUDA_VISIBLE_DEVICES="$LLMC_MEASURE_GPU" \
-python benchmark_relay.py \
+python __main__.py benchmark \
   --relay-pickle "$LLMC_RELAY" \
   --history "$LLMC_EVAL_RUN/measured.json" \
   --target "$LLMC_TARGET" \
@@ -709,7 +709,7 @@ export LLMC_TRAIN_RUN="$LLMC_WORK/runs/train_round01"
 mkdir -p "$LLMC_TRAIN_RUN"
 cd "$LLMC_REPO/LLM"
 
-python make_dataset.py \
+python __main__.py dataset \
   --for_type for_gen_train_sketch \
   --target "$LLMC_TARGET" \
   --network_info_dir "$LLMC_NET" \
@@ -722,7 +722,7 @@ python make_dataset.py \
   --test_file_idx 0
 
 CUDA_VISIBLE_DEVICES="$LLMC_TRAIN_GPUS" \
-python gen_state.py \
+python __main__.py generate \
   --target "$LLMC_TARGET" \
   --network_info_dir "$LLMC_NET" \
   --model_name_or_path "$LLMC_STAGE1" \
@@ -736,7 +736,7 @@ python gen_state.py \
   2>&1 | tee "$LLMC_WORK/logs/generate_train_round01.log"
 
 CUDA_VISIBLE_DEVICES="$LLMC_MEASURE_GPU" \
-python measure_programs.py \
+python __main__.py measure \
   --target "$LLMC_TARGET" \
   --network-info-dir "$LLMC_NET" \
   --to-measure-path "$LLMC_TRAIN_RUN/candidates.json" \
@@ -752,7 +752,7 @@ python measure_programs.py \
 ### 9.2 按 workload 拆分测量文件
 
 ```bash
-python split_measure_records.py \
+python __main__.py split-records \
   --input-path "$LLMC_TRAIN_RUN/measured.json" \
   --output-dir "$LLMC_TRAIN_RUN/measured_by_workload"
 ```
@@ -824,7 +824,7 @@ hold-out 过滤。增加每个 workload 的生成候选数并测量；不要把�
 ```bash
 cd "$LLMC_REPO/LLM"
 CUDA_VISIBLE_DEVICES="${LLMC_TRAIN_GPUS%%,*}" \
-python train/train_qwen3_dpo.py \
+python __main__.py train-dpo \
   --model_name_or_path "$LLMC_STAGE1" \
   --ref_model_name_or_path "$LLMC_STAGE1" \
   --tokenizer_name "$LLMC_STAGE1" \
@@ -953,7 +953,7 @@ attention mask 常量的 FP64 / FP32 / FP16 类型不一致，后续评测复用
 
 ```bash
 cd "$LLMC_REPO/LLM"
-python make_dataset.py \
+python __main__.py dataset \
   --for_type for_gen_train_sketch \
   --target "$LLMC_TARGET" \
   --network_info_dir "$LLMC_QWEN_NET" \
@@ -965,7 +965,7 @@ python make_dataset.py \
   --keep_cnt 48 --skip_hold_out True
 
 CUDA_VISIBLE_DEVICES="$LLMC_TRAIN_GPUS" \
-python gen_state.py \
+python __main__.py generate \
   --target "$LLMC_TARGET" \
   --network_info_dir "$LLMC_QWEN_NET" \
   --model_name_or_path "$LLMC_GENERATOR" \
@@ -978,7 +978,7 @@ python gen_state.py \
   2>&1 | tee "$LLMC_WORK/logs/generate_qwen3.log"
 
 CUDA_VISIBLE_DEVICES="$LLMC_MEASURE_GPU" \
-python measure_programs.py \
+python __main__.py measure \
   --target "$LLMC_TARGET" \
   --network-info-dir "$LLMC_QWEN_NET" \
   --to-measure-path "$LLMC_QWEN_RUN/candidates.json" \
@@ -1011,7 +1011,7 @@ np.savez(
 PY
 
 CUDA_VISIBLE_DEVICES="$LLMC_MEASURE_GPU" \
-python benchmark_relay.py \
+python __main__.py benchmark \
   --relay-pickle "$LLMC_QWEN_RELAY" \
   --input-npz "$LLMC_QWEN_RUN/inputs.npz" \
   --history "$LLMC_QWEN_RUN/measured.json" \
@@ -1050,7 +1050,7 @@ conda run --no-capture-output -n llm_compiler_collect \
 
 ```bash
 cd "$LLMC_REPO/LLM"
-python benchmark_relay_batch.py \
+python __main__.py benchmark-batch \
   --network-info-dir "$LLMC_NET" \
   --history "$LLMC_EVAL_RUN/measured.json" \
   --target "$LLMC_TARGET" \
@@ -1060,7 +1060,7 @@ python benchmark_relay_batch.py \
   --dry-run
 
 CUDA_VISIBLE_DEVICES="$LLMC_MEASURE_GPU" \
-python benchmark_relay_batch.py \
+python __main__.py benchmark-batch \
   --network-info-dir "$LLMC_NET" \
   --history "$LLMC_EVAL_RUN/measured.json" \
   --target "$LLMC_TARGET" \
@@ -1092,7 +1092,7 @@ python benchmark_relay_batch.py \
 `classify_network_speedup.py` 还可比较两份已测调度数据集。下面的自检使用第 9.2 节的拆分结果：
 
 ```bash
-python classify_network_speedup.py \
+python __main__.py classify-speedup \
   --baseline-path "$LLMC_TRAIN_RUN/measured_by_workload" \
   --lapo-path "$LLMC_TRAIN_RUN/measured_by_workload" \
   --network-info-dir "$LLMC_NET" \
@@ -1111,7 +1111,7 @@ export LLMC_NEXT_RUN="$LLMC_WORK/runs/train_round02"
 mkdir -p "$LLMC_NEXT_RUN"
 cd "$LLMC_REPO/LLM"
 
-python task_scheduler.py \
+python __main__.py schedule \
   --target "$LLMC_TARGET" \
   --network_info_dir "$LLMC_NET" \
   --to_measure_program_dir "$LLMC_STATES" \
@@ -1121,7 +1121,7 @@ python task_scheduler.py \
   --records_per_task 16 \
   --measurement_budget 20000
 
-python make_dataset.py \
+python __main__.py dataset \
   --for_type for_gen_train_sketch \
   --target "$LLMC_TARGET" \
   --network_info_dir "$LLMC_NET" \
@@ -1233,8 +1233,8 @@ Python 使用 Black、100 字符行宽；C++ 使用仓库的 `.clang-format`。
 C++ 测试需先 `make cpptest`，再执行 `./build/cpptest`。
 
 - [贡献指南](AGENTS.md)
-- [Qwen3 训练实现说明](LLM/train/qwen3_train_guide.md)
-- [指定 workload 的评测说明](LLM/eval_workload_test_guide.md)
+- [Qwen3 训练实现说明](LLM/docs/guides/qwen3_train_guide.md)
+- [指定 workload 的评测说明](LLM/docs/guides/eval_workload_test_guide.md)
 - [ONNX 导出与形状网格](LLM/export_onnx/README.md)
 - [Attention 独立比较](LLM/attention/README.md)
 - [TVM 源码构建文档](docs/install/from_source.rst)

@@ -8,11 +8,14 @@ import json
 import os
 import shlex
 import subprocess
+import sys
 from pathlib import Path
 
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-LLM_DIR = SCRIPT_DIR.parent
+if not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from LLM.core.layout import REPOSITORY_ROOT, module_command, project_pythonpath
 
 
 def parse_args():
@@ -37,15 +40,14 @@ def parse_args():
 def run(command, env, dry_run):
     print("$", shlex.join(command), flush=True)
     if not dry_run:
-        subprocess.run(command, check=True, env=env, cwd=LLM_DIR)
+        subprocess.run(command, check=True, env=env, cwd=REPOSITORY_ROOT)
 
 
 def generation_command(args, metadata, model_path, output_path):
     paths = metadata["paths"]
     stats_path = str(Path(output_path).with_suffix(".stats.json"))
     return [
-        args.python,
-        str(LLM_DIR / "gen_state.py"),
+        *module_command("gen_state.py", python=args.python),
         f"--target={metadata['target']}",
         f"--model_name_or_path={model_path}",
         f"--sketch_path={paths['sketch']}",
@@ -72,8 +74,7 @@ def generation_command(args, metadata, model_path, output_path):
 def measurement_command(args, metadata, candidate_path, measured_path):
     paths = metadata["paths"]
     return [
-        args.python,
-        str(LLM_DIR / "measure_programs.py"),
+        *module_command("measure_programs.py", python=args.python),
         f"--target={metadata['target']}",
         f"--network-info-dir={paths['network_info_dir']}",
         f"--to-measure-path={candidate_path}",
@@ -98,6 +99,7 @@ def main():
         raise ValueError(f"Unsupported experiment metadata: {metadata_path}")
 
     env = os.environ.copy()
+    env["PYTHONPATH"] = project_pythonpath(env.get("PYTHONPATH", ""))
     env["CUDA_VISIBLE_DEVICES"] = args.cuda_visible
     variants = {
         "pretrain": Path(args.pretrain_model).expanduser().resolve(),

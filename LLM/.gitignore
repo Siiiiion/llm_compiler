@@ -1,0 +1,8 @@
+# Python interpreter caches
+__pycache__/
+*.py[cod]
+
+# Generated run logs
+*.log
+*.log.*
+*.out

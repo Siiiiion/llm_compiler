@@ -13,7 +13,7 @@ This repository extends Apache TVM with language-model-guided tensor scheduling.
 
 Run from the repository root unless indicated. For a first build, copy `cmake/config.cmake` to `build/config.cmake` and configure LLVM/CUDA.
 
-- `pip install -r requirements.txt`: install legacy TLM dependencies. For Qwen3, consult `LLM/train/qwen3_train_guide.md` and verify model-library compatibility.
+- `pip install -r requirements.txt`: install legacy TLM dependencies. For Qwen3, consult `LLM/docs/guides/qwen3_train_guide.md` and verify model-library compatibility.
 - `cmake -S . -B build && cmake --build build -j4`: configure and build TVM.
 - `pip install -e ./python`: install local Python bindings; `make cython3`: rebuild extensions.
 - `make lint`, `make mypy`: run lint and type checks; `make pylint` and `make cpplint` select individual checks.
